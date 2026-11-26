@@ -94,14 +94,13 @@ The helper talks to the internet only where Stremio would: `web.stremio.com` (th
 
 ### 1. Download
 
-Either clone the repository:
+Either download the latest release — **[Releases](https://github.com/ADAMUSSO/stremio-offline/releases/latest) →
+Source code (zip / tar.gz)** — unzip it and open a terminal in the unzipped folder, or clone the repository:
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/offline-stremio.git
-cd offline-stremio
+git clone https://github.com/ADAMUSSO/stremio-offline.git
+cd stremio-offline
 ```
-
-or click **Code → Download ZIP** on GitHub, unzip it and open a terminal in the unzipped folder.
 
 > Put the folder somewhere permanent first (for example your home folder). The helper runs from this folder —
 > if you move or delete it later, Stremio will not start with the Offline features until you run the installer again.
