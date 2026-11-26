@@ -1,152 +1,291 @@
 # Offline Stremio
 
-Sťahovanie a offline prehrávanie priamo v aplikácii Stremio 5 — Linux (flatpak `com.stremio.Stremio` 1.2+) a macOS
-(Stremio 5 pre macOS, zatiaľ neotestované na skutočnom Macu), s akýmkoľvek účtom.
-Inšpirované [BurningSands70/stremio-downloader](https://github.com/BurningSands70/stremio-downloader), ktorý funguje iba so starým web UI v4 v samostatnom okne.
+Download movies and series **directly inside the Stremio 5 desktop app**, watch them **without internet**, and play
+the movies and series you already have on your own disks — all in Stremio's own player, with posters, episode
+names and subtitles.
 
-> **English summary:** a small local helper for the Stremio 5 desktop app on Linux (flatpak) and macOS. It adds a download
-> button next to every stream, an "Offline" section in Stremio's sidebar (downloads plus movies and series from your own
-> folders/HDD, matched with Cinemeta), offline playback in Stremio's player and an offline-capable UI.
-> Linux: `./install.sh` / `./uninstall.sh`. macOS (untested on real hardware): `./install-macos.sh`, then reopen Stremio
-> as usual; `./uninstall-macos.sh`. Developer notes are in [DEVELOPMENT.md](DEVELOPMENT.md).
+> **Unofficial project.** It is not affiliated with or endorsed by Stremio; "Stremio" is a trademark of its owners.
+> Offline Stremio ships **no content sources** — it only downloads what you already play through your own add-ons,
+> and you are responsible for what you download under the laws of your country. It does not unlock or modify
+> Stremio's own paid downloader.
 
-Vývoj a architektúra: [DEVELOPMENT.md](DEVELOPMENT.md).
+---
 
-> **Neoficiálny projekt.** Nie je spojený so Stremiom ani ním podporovaný; „Stremio“ je ochranná známka jeho vlastníkov.
-> Projekt neobsahuje ani neodporúča žiadne zdroje obsahu — sťahuje len to, čo už prehrávaš cez svoje addony,
-> a za obsah, ktorý si stiahneš, zodpovedáš ty (podľa zákonov svojej krajiny). Natívny downloader Stremia
-> pre platené účty neodomyká ani nemení.
->
-> *Unofficial project, not affiliated with or endorsed by Stremio. It ships no content sources; you are responsible
-> for what you download.*
+## Features
 
-**Požiadavky:**
-- **Linux:** Stremio z Flathubu (`com.stremio.Stremio`), Node.js 20+, `openssl`, voliteľne `ffmpeg` (HLS streamy)
-  a `zenity` (systémové okno na výber priečinka).
-- **macOS:** Stremio 5 pre macOS v `/Applications`, Node.js 20+ (`brew install node` alebo inštalátor z nodejs.org —
-  Node, ktorý má Stremio v sebe, je verzia 16 a nestačí), voliteľne `ffmpeg` (`brew install ffmpeg`).
+- **⬇ next to every stream** — on a movie or episode page, every stream gets a download button. It shows the
+  progress in % and turns into ✓ when the file is saved.
+- **"Offline" in Stremio's sidebar** — a new section with everything you can watch offline:
+  downloads in progress (pause, resume, delete) and grids of **Movies** and **Series**.
+- **Series grouped in folders** — all episodes of a show sit in one card with the show's poster. Opening it shows
+  only the seasons that have at least one episode.
+- **Your own folders and external drives** — add folders like `Movies` or `Series` from your disk or HDD.
+  File names are recognised (`Inception.2010.1080p.mkv`, `S01E02`, `1x02`, `Season 2/…`), matched with Stremio's
+  catalogue (posters, descriptions, episode titles — local titles such as *Pelíšky* or *Kolja* work too) and played
+  in Stremio. Subtitles next to the video (`Movie.en.srt`) are offered in the player.
+  Your files are only read — never moved, renamed or deleted.
+- **External drives just work** — plug a drive in and its movies appear within a few seconds; unplug it and they
+  are hidden until it is back.
+- **Choose where downloads go** — e.g. straight to an external HDD to keep your computer clean. If that drive is not
+  connected, downloads go to the default folder again.
+- **Works without internet** — Stremio's interface is cached on your computer, so the app starts and plays your
+  offline videos even with no connection.
+- **Your account stays as it is** — library, add-ons and settings are untouched (on Linux you even stay logged in).
+- **Starts and stops with Stremio** — the small helper only runs while Stremio is open (or while something is still
+  downloading).
 
-Bez externých npm balíkov.
+## Platforms
 
-## Čo pribudne v Stremiu
-
-- **⬇ pri každom streame** v detaile filmu/epizódy: klik spustí sťahovanie, tlačidlo ukazuje percentá a potom ✓.
-- **Položka „Offline“ v bočnom menu** (pod Library): rozpracované sťahovania (pauza, pokračovanie, mazanie),
-  sekcie **Movies** a **Series** (stiahnuté aj z priečinkov na disku spolu). Klik na plagát filmu ho prehrá
-  v prehrávači Stremia, aj bez internetu. Epizódy jedného seriálu sú spolu v „priečinku“ s plagátom seriálu;
-  po otvorení sa ukážu len série, v ktorých nejaká epizóda je.
-- **Kam sa sťahuje** (Offline → Settings → Downloads): predvolene `~/Videos/Stremio`, cez „Change…“ sa dá vybrať
-  iný priečinok, napr. na externom HDD. Keď vybraný disk nie je pripojený (alebo je len na čítanie), nastavenie sa
-  samo vráti na predvolený priečinok a ukáže sa vysvetlenie; po pripojení disku ho vyber znova. Stiahnuté filmy
-  na odpojenom disku sa skryjú a vrátia sa po jeho pripojení. Torrenty počas sťahovania prechádzajú cez vyrovnávaciu
-  pamäť Stremia v počítači (`~/.var/app/com.stremio.Stremio/.stremio-server`, Stremio ju samo obmedzuje).
-- **Priečinky z disku/HDD** (Offline → Settings → Library folders): vyber priečinok (skratky Home, Videos, pripojené disky
-  z `/media`, `/mnt`, alebo systémové okno), typ Auto / Movies / Series. Súbory sa rozpoznajú podľa názvu
-  (`Názov.2010.1080p…`, `S01E02`, `1x02`, priečinky „Season 2“ / „Séria 2“) a spárujú s Cinemetou
-  (plagát, popis, názvy epizód; funguje aj s českými/slovenskými názvami ako Pelíšky, Kolja).
-  Titulky vedľa videa (`Film.sk.srt`) sa ponúknu v prehrávači. Súbory sa iba čítajú — nič sa nepresúva ani nemaže.
-  Odpojený disk sa ukáže ako „Not connected“ a jeho filmy sa vrátia po pripojení — pripojenie aj odpojenie disku
-  sa zistí do 5 sekúnd a knižnica sa sama prehľadá. Inak sa prehľadáva pri štarte, každých 30 minút a tlačidlom Rescan.
-  Typ Auto sa spresní podľa názvu priečinka (SERIES/Seriály/Shows → seriály, MOVIES/Filmy → filmy); súbory v jednom
-  priečinku, ktoré sa líšia len číslom na konci (`chernobyl 1`, `chernobyl 2`), sú epizódy.
-- **Addon „Offline Downloads“** (voliteľný, inštalácia jedným klikom zo stránky Offline): riadok „Offline“ na Boarde
-  a stream `💾 Offline` v zozname streamov pri titule.
-- **Štart bez internetu**: web UI Stremia sa ukladá na disk, takže appka sa načíta aj offline.
-
-Prihlásenie, knižnica, addony a nastavenia ostávajú — UI beží na rovnakom origine ako doteraz.
-
-## Ako to funguje
-
-```
-Stremio (GTK/WebKit shell, mpv)
-   │  --url http://127.0.0.1:11470/proxy/d=https://127.0.0.1:11489/
-   ▼
-Stremio streaming server :11470 (/proxy)  ── origin ostáva 127.0.0.1:11470
-   ▼
-offline-stremio pomocník (node, :11488 HTTP + :11489 HTTPS, systemd socket aktivácia)
-   ├─ /            proxy na web.stremio.com + vložený inject.js, odpovede sa ukladajú na disk
-   ├─ /__dl/api    správca sťahovania a knižnice priečinkov
-   ├─ /lib         súbory z priečinkov knižnice (iba prehľadané súbory)
-   ├─ /addon       Stremio addon: katalóg, meta z cache, stream "💾 Offline"
-   └─ /files       stiahnuté súbory s podporou Range (pretáčanie)
-   │
-   ▼  torrenty
-Stremio streaming server (127.0.0.1:11470/{infoHash}/{fileIdx})
-```
-
-- Linux shell Stremia má prepínač `--url` a IPC pre mpv vkladá do každej stránky.
-- Proxy streaming servera vie iba HTTPS (self-signed certifikát akceptuje), preto druhý port 11489 s certifikátom z `openssl`.
-- Odkaz na stream (`#/player/...`) je base64(zlib(JSON)) zo stremio-core; server z neho vyčíta torrent / URL.
-- Torrent cez streaming server Stremia, HTTP/debrid priamo (pokračuje cez Range), HLS cez `ffmpeg -c copy` do `.mkv`.
-- Keď sa Stremio zavrie počas sťahovania torrentu, sťahovanie počká a po ďalšom spustení pokračuje.
-- Pomocník sa spustí, až keď ho Stremio zavolá (systemd socket). Keď je Stremio zatvorené a nič sa nesťahuje,
-  neprehráva ani neprehľadáva, po minúte sa sám vypne (`IDLE_EXIT_MS`, 0 = nikdy).
-
-## Inštalácia / odinštalovanie
-
-### Linux
-
-```bash
-./install.sh
-```
-
-```bash
-./uninstall.sh
-```
-
-Po oboch treba Stremio úplne ukončiť (aj z tray) a spustiť znova. Odinštalovanie nechá súbory v `~/Videos/Stremio`.
-Ak sa zmení cesta k `node` (napr. iná verzia v nvm), spusti `./install.sh` znova.
-
-### macOS (neotestované na skutočnom Macu)
-
-```bash
-./install-macos.sh
-```
-
-Rovnako ako na Linuxe nevzniká nová aplikácia — **bežná ikona Stremia** (Dock, Aplikácie) otvorí Stremio s funkciami
-Offline. Inštalátor pridá malého strážcu (LaunchAgent, spúšťa sa pri prihlásení), ktorý:
-
-- nastaví pre aplikácie z Docku/Findera premennú `WEBUI_URL` — Stremio 5 pre macOS ju číta ako `--webui-url`,
-- pri štarte Stremia spustí pomocníka; ten sa sám vypne asi minútu po zatvorení Stremia, keď nič nesťahuje.
-
-Po inštalácii Stremio úplne ukonči (Cmd+Q) a otvor znova. Stremio.app sa nemení.
-
-- Prvý raz sa treba do Stremia znova prihlásiť (rozhranie beží z lokálnej adresy, nie z `web.stremio.com`).
-- macOS ukáže „Pridaná položka na pozadí“ a môže sa opýtať, či `node` smie čítať externý disk alebo priečinok
-  Stiahnuté — povoľ to (prípadne Nastavenia → Súkromie a bezpečnosť).
-- Predvolené sťahovanie: `~/Movies/Stremio`, dáta: `~/Library/Application Support/stremio-offline`,
-  záznamy: `~/Library/Logs/offline-stremio*.log`. Disky z `/Volumes` sa zobrazujú medzi skratkami.
-- Keby bežné Stremio funkcie Offline neukázalo (premenná `WEBUI_URL` je zistená z aplikácie, nie overená na Macu),
-  `./install-macos.sh --launcher` pridá aj záložnú aplikáciu **Stremio Offline**, ktorá spúšťa Stremio
-  s `--webui-url` priamo.
-
-```bash
-./uninstall-macos.sh
-```
-
-## Nastavenia (env premenné; na Linuxe v `~/.config/systemd/user/stremio-offline.service`)
-
-| premenná | predvolené |
+| Platform | Status |
 |---|---|
-| `PORT` / `HTTPS_PORT` | `11488` / `11489` |
-| `DOWNLOAD_DIR` | `~/Videos/Stremio`, na macOS `~/Movies/Stremio` (vlastný sa nastavuje v Offline → Settings) |
-| `DATA_DIR` | `~/.local/share/stremio-offline`, na macOS `~/Library/Application Support/stremio-offline` |
-| `ENABLE_HTTPS` | `1` na Linuxe (proxy streaming servera), inak `0` |
-| `IDLE_EXIT` | `1` = vypnúť sa po zatvorení Stremia aj bez systemd (nastavuje strážca na macOS) |
-| `MAX_PARALLEL` | `2` |
+| **Linux** — Stremio from Flathub (`com.stremio.Stremio` 1.2+) | ✅ used daily |
+| **macOS** — Stremio 5 for macOS | 🧪 implemented, **not yet tested on a real Mac** — feedback welcome |
+| **Windows** | ⏳ not yet (the code is prepared, the installer is missing) |
 
-Pre samotné Stremio: `STREMIO_ENV` pri inštalácii pridá premenné prostredia do spúšťania Stremia (predvolene žiadne).
-Blikanie pri hoveri/scrollovaní je chyba samotného Stremia pre Linux (WebKitGTK, stremio-linux-shell #61, #67).
-`WEBKIT_DISABLE_DMABUF_RENDERER=1` ho na notebooku Intel + NVIDIA neodstránilo, ale spôsobilo extrémne sekanie
-a miznúce časti UI — nepoužívať. Nepomohol ani `GDK_DISABLE=offload`.
+## How it works
 
-## Poznámky
+The Stremio desktop window is a web page (`web.stremio.com`) shown inside the app, plus Stremio's own **streaming
+server** that runs on your computer at `127.0.0.1:11470` and plays torrents.
 
-- Projekt sa volá `offline-stremio`; technické názvy ostali `stremio-offline` (systemd služba, priečinok dát,
-  id addonu `community.stremio-offline`), aby sa pri premenovaní nerozbili existujúce inštalácie.
+Offline Stremio adds a small **helper** (a Node.js program, no extra packages) that also runs only on your computer
+(`127.0.0.1`, not reachable from the network):
 
-- Stremio má aj vlastný natívny downloader (`#/downloads`), ale iba pre platené „Supporter“ účty a bez offline štartu UI.
-  Tento projekt ho neodomyká ani nemení — je to samostatný downloader.
-- Addon sa synchronizuje do účtu; na iných zariadeniach (mobil, TV) bude nedostupný (`127.0.0.1` je tam iné zariadenie).
-- Rýchlosť torrentov obmedzuje torrent profil v Stremiu (Settings → Streaming; predvolený ~3,5 MB/s).
-- YouTube streamy a externé odkazy sa sťahovať nedajú.
+```
+Stremio app (window + mpv player)
+   │  opens the interface from the helper instead of directly from web.stremio.com
+   ▼
+Offline Stremio helper (127.0.0.1:11488)
+   ├─ serves Stremio's normal web interface + a small script that adds ⬇ buttons and the Offline section
+   ├─ keeps a copy of the interface on disk           → Stremio starts without internet
+   ├─ downloads streams                                → torrents through Stremio's own streaming server,
+   │                                                     HTTP/debrid links directly, HLS via ffmpeg
+   ├─ scans your library folders and drives            → matched with Stremio's catalogue (Cinemeta)
+   └─ a local Stremio add-on + file server             → Stremio's player plays the files from your disk
+```
+
+How Stremio is pointed to the helper — **you keep starting Stremio from its normal icon**:
+
+- **Linux:** the installer adds a user-level D-Bus override so the Stremio app starts with
+  `--url` pointing to the helper, and a systemd *socket* that starts the helper only when Stremio connects.
+- **macOS:** a small login agent sets `WEBUI_URL` for apps started from the Dock/Finder (Stremio 5 for macOS reads it
+  as `--webui-url`) and starts the helper whenever Stremio is running.
+
+The Stremio app itself is never modified, and the uninstaller restores the normal start.
+
+The helper talks to the internet only where Stremio would: `web.stremio.com` (the interface), Stremio's catalogue
+(titles and posters) and your stream sources. No telemetry.
+
+## Requirements
+
+**Linux**
+- Stremio from Flathub: `flatpak install flathub com.stremio.Stremio`
+- Node.js **20 or newer** (`node --version`). If your distribution ships an older one, use [nvm](https://github.com/nvm-sh/nvm)
+  or the packages from [nodejs.org](https://nodejs.org).
+- `openssl` (usually preinstalled)
+- optional: `ffmpeg` (for HLS streams), `zenity` (for the system folder picker)
+
+**macOS**
+- Stremio 5 for macOS in `/Applications` ([stremio.com/downloads](https://www.stremio.com/downloads))
+- Node.js **20 or newer**: `brew install node` or the installer from [nodejs.org](https://nodejs.org)
+  (the Node.js bundled inside Stremio is version 16, which is too old)
+- optional: `ffmpeg` (`brew install ffmpeg`) for HLS streams
+
+## Installation
+
+### 1. Download
+
+Either clone the repository:
+
+```bash
+git clone https://github.com/YOUR-USERNAME/offline-stremio.git
+cd offline-stremio
+```
+
+or click **Code → Download ZIP** on GitHub, unzip it and open a terminal in the unzipped folder.
+
+> Put the folder somewhere permanent first (for example your home folder). The helper runs from this folder —
+> if you move or delete it later, Stremio will not start with the Offline features until you run the installer again.
+
+### 2a. Linux
+
+```bash
+bash install.sh
+```
+
+Then **quit Stremio completely** — also from the tray icon if it is there — and start it again from its normal icon.
+
+You will see **Offline** in the left sidebar, under *Library*. You stay logged in.
+
+### 2b. macOS
+
+Open **Terminal** in the project folder and run:
+
+```bash
+bash install-macos.sh
+```
+
+Then **quit Stremio** (⌘Q) and open it again from the Dock or Applications as usual.
+
+- The first time you need to **log in to Stremio again** — the interface now runs from a local address instead of
+  `web.stremio.com`, which has its own login.
+- macOS shows a *"Background item added"* notice (the small login agent) and may ask whether **node** may access a
+  removable volume or your Downloads folder — allow it. You can change this later in
+  *System Settings → Privacy & Security*.
+- If the normal Stremio icon does not show the Offline section, install the fallback launcher and start Stremio with
+  **Stremio Offline** from Applications instead:
+
+  ```bash
+  bash install-macos.sh --launcher
+  ```
+
+### 3. Optional: the add-on
+
+On the **Offline** page you can click **Install add-on**. It adds "Offline" rows to the Board and Discover, and a
+`💾 Offline` stream on the page of every title you have offline. Everything else works without it.
+
+The add-on is saved to your Stremio account, so on your other devices (phone, TV) it shows as unavailable — it only
+exists on this computer.
+
+## Using it
+
+### Download a movie or an episode
+
+1. Open a movie or an episode and look at the list of streams.
+2. Click **⬇** next to a stream. The button shows the progress; click it again to open the Offline section.
+3. When it shows **✓**, the file is saved and plays without internet.
+
+Downloads continue in the background while Stremio is open. Torrent downloads that were interrupted because Stremio
+was closed continue the next time you open it.
+
+### Watch offline
+
+Open **Offline** in the sidebar:
+
+- **Movies** — click a poster to play. **ⓘ** opens the normal Stremio page, **🗑** deletes a downloaded file
+  (files from your own folders are never deleted).
+- **Series** — each show is a folder card with the number of episodes. Open it to see the seasons and episodes you
+  have and play any of them. Stremio continues to the next episode automatically.
+- **Downloading** — progress, speed, pause, resume and delete for running downloads.
+
+### Add your own folders or an external drive
+
+**Offline → Settings → Library folders**
+
+1. Pick a folder: use the shortcuts (Home, Videos/Movies, Downloads and connected drives), click through the
+   folders, or use **Choose in system dialog…**.
+2. Choose what is inside: **Auto**, **Movies** or **Series** (folders named `Movies`, `Filmy`, `Series`, `Shows`…
+   are recognised automatically in Auto mode).
+3. Click **Add this folder**. The folder is scanned and matched with Stremio's catalogue.
+
+Names that work well:
+
+```
+Movies/Inception (2010)/Inception.2010.1080p.mkv
+Movies/Inception (2010)/Inception.2010.1080p.en.srt      ← subtitles next to the video
+Series/Dark/Season 1/Dark.S01E02.mkv
+Series/Dark/dark 3x4.mkv
+Series/Chernobyl/chernobyl 1.mkv                           ← "name + number" files in one folder = episodes
+```
+
+Titles that cannot be found in Stremio's catalogue (home videos, abbreviations) still play — they just show the file
+name instead of a poster.
+
+When you connect or disconnect a drive, the library updates by itself within a few seconds. **Rescan** is only needed
+if you add files while the drive stays connected (otherwise it happens every 30 minutes).
+
+### Choose where downloads are saved
+
+**Offline → Settings → Downloads → Change…** — pick a folder (for example on your external HDD) and click
+**Save downloads here**. **Use default** switches back.
+
+If the chosen drive is not connected, downloads go to the default folder again and the page tells you so — choose the
+drive again after you connect it. Videos you downloaded to a drive are hidden while it is disconnected and come back
+when you plug it in. If you move downloaded files into one of your library folders, Offline Stremio notices it and
+shows them from the library.
+
+## Where things are stored
+
+| | Linux | macOS |
+|---|---|---|
+| Downloads (default) | `~/Videos/Stremio` | `~/Movies/Stremio` |
+| Helper data (lists, cache, posters) | `~/.local/share/stremio-offline` | `~/Library/Application Support/stremio-offline` |
+| Logs | `journalctl --user -u stremio-offline` | `~/Library/Logs/offline-stremio.log`, `offline-stremio-agent.log` |
+
+## Configuration
+
+Environment variables (Linux: in `~/.config/systemd/user/stremio-offline.service`; macOS: in the agent's
+`~/Library/LaunchAgents/community.offline-stremio.plist`). The defaults are fine for most people.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PORT` | `11488` | helper port (Linux also uses `PORT + 1` for HTTPS) |
+| `DOWNLOAD_DIR` | see table above | default download folder (a custom one is set in Offline → Settings) |
+| `DATA_DIR` | see table above | where the helper keeps its data |
+| `MAX_PARALLEL` | `2` | downloads at the same time |
+| `IDLE_EXIT_MS` | `60000` | how long after Stremio closes the helper stops (0 = never) |
+
+## Updating
+
+```bash
+git pull
+bash install.sh          # Linux
+bash install-macos.sh    # macOS
+```
+
+If you downloaded a ZIP, download the new one, replace the old folder's contents and run the installer again.
+Then restart Stremio.
+
+## Uninstall
+
+```bash
+bash uninstall.sh        # Linux
+bash uninstall-macos.sh  # macOS
+```
+
+Quit Stremio and start it again — it is back to normal. Your downloaded videos and the helper data stay where they
+are (see *Where things are stored*); delete them yourself if you want.
+
+## Troubleshooting
+
+**Stremio shows a blank window or an error.** The helper is not running.
+- Linux: `systemctl --user status stremio-offline.socket stremio-offline.service` and
+  `journalctl --user -u stremio-offline -n 50`. If you updated Node.js (for example with nvm), its path changed —
+  run `bash install.sh` again.
+- macOS: look at `~/Library/Logs/offline-stremio.log` and `offline-stremio-agent.log`.
+
+**There is no "Offline" in the sidebar.** Quit Stremio completely (Linux: also from the tray; macOS: ⌘Q) and start it
+again. On macOS try the fallback launcher (`bash install-macos.sh --launcher`).
+
+**Torrent downloads are slow.** Stremio limits torrent speed with its torrent profile: Settings → Streaming →
+**Torrent Profile** (choose a faster one).
+
+**The whole Stremio window flickers when hovering on Linux.** This is a bug of Stremio's Linux app itself
+(WebKitGTK, see stremio-linux-shell issues #61 and #67) and happens without Offline Stremio too.
+
+**A drive is not found on macOS.** Allow *node* to access removable volumes in
+System Settings → Privacy & Security → Files and Folders (or Full Disk Access).
+
+**A title has no poster / the wrong one.** It could not be matched with Stremio's catalogue from the file name.
+Rename the file like `Title (Year).mkv` or `Show S01E02.mkv` and click **Rescan**.
+
+**YouTube streams and external links cannot be downloaded** — only torrents, HTTP/debrid links and HLS streams.
+
+## Limitations
+
+- Stremio loads its interface from the internet and changes it from time to time; an update can break parts of the
+  Offline section until this project is updated.
+- macOS support is not tested on real hardware yet. Windows is not supported yet.
+- On macOS you have to log in to Stremio once more after installing.
+
+## Development
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) — architecture, file overview, how to run a development instance next to your
+installed one, test tools (a Creative Commons test add-on and a fake library drive) and the Stremio quirks this
+project works around.
+
+## Credits & license
+
+Inspired by [BurningSands70/stremio-downloader](https://github.com/BurningSands70/stremio-downloader), which worked with
+the old Stremio 4 web interface in a separate window.
+
+MIT License — see [LICENSE](LICENSE).

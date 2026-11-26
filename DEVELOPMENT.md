@@ -1,78 +1,96 @@
-# Offline Stremio — poznámky pre vývoj
+# Offline Stremio — developer notes
 
-Čistý Node.js (≥ 20, ESM), žiadne npm závislosti. Komentáre v kóde sú po slovensky, texty v UI po anglicky.
+Plain Node.js (≥ 20, ES modules), no npm dependencies. UI texts are in English; code comments are in Slovak.
 
-## Architektúra
+## Architecture
+
+### Linux
 
 ```
 Stremio (flatpak, stremio-linux-shell: GTK4 + WebKitGTK + mpv)
-   │  spustený s --url http://127.0.0.1:11470/proxy/d=https%3A%2F%2F127.0.0.1%3A11489/
-   ▼     (prepísaný D-Bus súbor ~/.local/share/dbus-1/services/com.stremio.Stremio.service)
-Stremio streaming server :11470  /proxy/d=<https cieľ>/…   ← origin stránky ostáva 127.0.0.1:11470
+   │  started with --url http://127.0.0.1:11470/proxy/d=https%3A%2F%2F127.0.0.1%3A11489/
+   ▼     (user D-Bus override ~/.local/share/dbus-1/services/com.stremio.Stremio.service)
+Stremio streaming server :11470  /proxy/d=<https target>/…   ← the page origin stays 127.0.0.1:11470
    ▼
-server.js  (:11488 HTTP, :11489 HTTPS self-signed; systemd socket aktivácia, fd 3 = HTTP, fd 4 = HTTPS)
-   ├─ /                 lib/proxy.js     proxy na web.stremio.com, do HTML vloží <script src=":11488/__dl/inject.js">,
-   │                                     každú odpoveď uloží na disk (web-cache) → UI sa načíta aj offline
-   ├─ /__dl/inject.js   public/inject.js klientsky skript v Stremiu (tlačidlá ⬇, menu „Offline“, stránka Offline)
-   ├─ /__dl/api/…       server.js        API pre inject.js (sťahovanie, knižnica, prehliadanie priečinkov)
-   ├─ /addon/…          lib/addon.js     Stremio addon: catalog, meta, stream, subtitles
-   ├─ /files/<id>/…     lib/files.js     stiahnuté súbory (Range)
-   ├─ /lib/<id>/…       lib/files.js     súbory z knižnice priečinkov (iba indexované)
-   ├─ /libsub/<id>/<n>                   titulky vedľa videa
-   └─ /img/<sha1>                        uložené plagáty/pozadia (offline)
+server.js  (:11488 HTTP, :11489 HTTPS self-signed; systemd socket activation, fd 3 = HTTP, fd 4 = HTTPS)
 ```
 
-Prečo cez proxy streaming servera: proxy `/proxy/d=` prijme iba HTTPS ciele (self-signed certifikát mu nevadí),
-a vďaka nej stránka ostane na origine `127.0.0.1:11470` — rovnaký localStorage ako pôvodné Stremio,
-takže prihlásenie, knižnica a addony ostanú. Shell vkladá svoj IPC skript (mpv) do každej stránky, preto prehrávač funguje.
+Why through the streaming server's proxy: `/proxy/d=` only accepts HTTPS targets (it accepts self-signed
+certificates), and it keeps the page on the origin `127.0.0.1:11470` — the same localStorage as the original Stremio,
+so the login, library and add-ons stay. The shell injects its IPC script (mpv) into every page, so the player works.
 
-## Súbory
+### macOS
 
-| súbor | čo robí |
+```
+Stremio 5 for macOS (Rust, WKWebView + mpv), started from the Dock/Finder
+   │  reads WEBUI_URL=http://127.0.0.1:11488/ (set by launchctl setenv in the login agent)
+   ▼
+server.js  (:11488 HTTP only, started by macos/offline-stremio-agent.sh with IDLE_EXIT=1)
+```
+
+### The helper (all platforms)
+
+```
+server.js
+   ├─ /                 lib/proxy.js     proxy to web.stremio.com, injects <script src=":11488/__dl/inject.js"> into the HTML,
+   │                                     stores every response on disk (web-cache) → the UI also loads offline
+   ├─ /__dl/inject.js   public/inject.js client script inside Stremio (⬇ buttons, "Offline" menu item and page)
+   ├─ /__dl/api/…       server.js        API for inject.js (downloads, library, folder browsing, settings)
+   ├─ /addon/…          lib/addon.js     Stremio add-on: catalog, meta, stream, subtitles
+   ├─ /files/<id>/…     lib/files.js     downloaded files (Range)
+   ├─ /lib/<id>/…       lib/files.js     files from library folders (indexed files only)
+   ├─ /libsub/<id>/<n>                   subtitles next to a library video
+   └─ /img/<sha1>                        cached posters/backgrounds (offline)
+```
+
+## Files
+
+| File | Purpose |
 |---|---|
-| `server.js` | HTTP/HTTPS server, routing, API, CORS (UI z originu Stremia), automatické vypnutie |
-| `lib/config.js` | porty, cesty, env premenné |
-| `lib/proxy.js` | proxy web UI + vloženie skriptu + diskový cache |
-| `lib/playerLink.js` | dekódovanie `#/player/{stream}/…` (base64(zlib(JSON)) zo stremio-core) |
-| `lib/downloads.js` | správca sťahovania: torrent cez `:11470/{hash}/{idx}`, HTTP s Range, HLS cez ffmpeg |
-| `lib/library.js` | knižnica priečinkov: prehľadanie, parsovanie názvov, párovanie s Cinemetou |
-| `lib/metas.js` | uložené meta a obrázky pre offline |
-| `lib/addon.js` | Stremio addon + dáta pre stránku Offline (playerHref, detailHref) |
-| `lib/fsbrowse.js` | zoznam priečinkov a systémový výber (zenity) |
-| `lib/files.js` | servovanie súborov s Range |
-| `lib/store.js` | JSON úložisko s atomickým zápisom |
-| `lib/settings.js` | nastavenie priečinka na sťahovanie (`settings.json`), návrat na predvolený pri odpojenom disku |
-| `lib/tls.js` | self-signed certifikát (openssl), iba Linux |
-| `lib/node-check.js` | kontrola Node 20+ (prvý import v `server.js`) |
-| `public/inject.js` | celé UI v Stremiu (vanilla JS + CSS v jednom súbore) |
-| `install.sh` / `uninstall.sh` | Linux: systemd socket + služba, D-Bus override |
-| `install-macos.sh` / `uninstall-macos.sh` | macOS: LaunchAgent + `WEBUI_URL`, voliteľne spúšťač `Stremio Offline.app` |
-| `macos/offline-stremio-agent.sh` | macOS strážca: nastaví `WEBUI_URL`, so Stremiom spustí pomocníka |
-| `dev/` | nástroje na vývoj (nižšie) |
+| `server.js` | HTTP/HTTPS server, routing, API, CORS (UI on Stremio's origin), idle exit |
+| `lib/config.js` | ports, paths and env variables per platform (Linux / macOS / Windows) |
+| `lib/node-check.js` | Node 20+ check (first import in `server.js`) |
+| `lib/proxy.js` | web UI proxy + script injection + disk cache |
+| `lib/playerLink.js` | decodes `#/player/{stream}/…` (base64(zlib(JSON)) from stremio-core) |
+| `lib/downloads.js` | download manager: torrents via `:11470/{hash}/{idx}`, HTTP with Range resume, HLS via ffmpeg |
+| `lib/library.js` | library folders: scanning, file name parsing, Cinemeta matching, drive (un)plug detection |
+| `lib/metas.js` | cached metadata and images for offline use |
+| `lib/addon.js` | Stremio add-on + data for the Offline page (playerHref, detailHref) |
+| `lib/settings.js` | download folder setting (`settings.json`), falls back to the default when the drive is missing |
+| `lib/fsbrowse.js` | folder listing, drive shortcuts and the system folder picker (zenity / osascript / PowerShell) |
+| `lib/files.js` | file serving with Range |
+| `lib/store.js` | JSON store with atomic writes |
+| `lib/tls.js` | self-signed certificate (openssl), Linux only |
+| `public/inject.js` | the whole UI inside Stremio (vanilla JS + CSS in one file) |
+| `install.sh` / `uninstall.sh` | Linux: systemd socket + service, D-Bus override |
+| `install-macos.sh` / `uninstall-macos.sh` | macOS: LaunchAgent + `WEBUI_URL`, optional launcher `Stremio Offline.app` |
+| `macos/offline-stremio-agent.sh` | macOS login agent: sets `WEBUI_URL`, starts the helper while Stremio runs |
+| `dev/` | development tools (below) |
 
-Dáta: `~/.local/share/stremio-offline/` — `downloads.json`, `library.json`, `settings.json`, `meta/`, `img/`, `web-cache/`, `tls/`, `addon-seen`.
+Data (Linux `~/.local/share/stremio-offline/`, macOS `~/Library/Application Support/stremio-offline/`):
+`downloads.json`, `library.json`, `settings.json`, `meta/`, `img/`, `web-cache/`, `tls/` (Linux), `addon-seen`.
 
-## Ako sa robí vývoj
+## Development workflow
 
 ```bash
-# vývojová inštancia na portoch 11590/11591 s vlastnými dátami (nainštalovaná verzia beží ďalej)
+# development instance on ports 11590/11591 with its own data (the installed one keeps running)
 npm run dev
-# testovací addon s Creative Commons streamami (Sintel torrent, Big Buck Bunny HTTP + HLS)
+# test add-on with Creative Commons streams (Sintel torrent, Big Buck Bunny HTTP + HLS)
 npm run test-addon
-# falošný HDD s malými videami (filmy, seriály, titulky, nezhodné domáce video)
+# fake drive with tiny videos (movies, series, subtitles, an unmatched home video)
 npm run test-library
 ```
 
-Potom otvor URL, ktorú vypíše `npm run dev`, v prehliadači (Stremio musí bežať kvôli `:11470`).
-V tom profile prehliadača nainštaluj `http://127.0.0.1:11499/manifest.json` (CC streamy) a v Offline → Folders pridaj
-`/tmp/offline-stremio-test-hdd/Movies` a `…/Series`.
+Open the URL printed by `npm run dev` in a browser (Stremio must be running because of `:11470`). In that browser
+profile install `http://127.0.0.1:11499/manifest.json` (CC streams) and in Offline → Settings add
+`/tmp/offline-stremio-test-hdd/Movies` and `…/Series`.
 
-`public/inject.js` sa číta z disku pri každej požiadavke — stačí obnoviť stránku. Zmeny v `lib/` a `server.js`
-vyžadujú reštart (`systemctl --user restart stremio-offline.service` pre nainštalovanú verziu).
+`public/inject.js` is read from disk on every request — reloading the page is enough. Changes in `lib/` and
+`server.js` need a restart (`systemctl --user restart stremio-offline.service` for the installed Linux version).
 
-Logy: `journalctl --user -u stremio-offline.service -f`.
+Logs: `journalctl --user -u stremio-offline.service -f` (Linux), `~/Library/Logs/offline-stremio*.log` (macOS).
 
-Užitočné na testovanie automatického vypnutia (simulácia socket aktivácie a zatvoreného Stremia):
+Testing the idle exit (simulated socket activation and a closed Stremio):
 
 ```bash
 STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x \
@@ -80,112 +98,115 @@ STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x
   -E STREAMING_SERVER -E IDLE_EXIT_MS -E PORT -E DATA_DIR node server.js
 ```
 
-## Záludnosti Stremia 5 (web UI), na ktoré sme narazili
+"macOS mode" can be tried on Linux: `ENABLE_HTTPS=0 IDLE_EXIT=1 PORT=11590 DATA_DIR=/tmp/x node server.js` and open
+`http://127.0.0.1:11590/`.
 
-- **Navigácia cez `history.pushState`** — nevyvolá `hashchange`. `inject.js` preto obaľuje pushState/replaceState
-  (`watchRoute`) a má aj poistku každých 500 ms.
-- **Triedy sú CSS moduly s hashom** (`nav-tab-button-tW6qT`) a menia sa s každým buildom → selektory vždy cez
-  `[class*="vertical-nav-bar"]` a podobne.
-- **Nemeniť triedy na prvkoch, ktoré spravuje React** (napr. `selected` v menu) — React ich nemusí vrátiť.
-  Zvýraznenie potláčame CSS-kom cez triedu na `<html>` (`sdl-offline-open`).
-- **Stránka Offline je na trase `#/?offline=1`** (Board s parametrom), lebo pri neznámej trase Stremio zobrazí
-  „Page not found“ bez menu. `#/downloads` patrí natívnemu downloaderu Stremia (iba pre platené Supporter účty — nemeniť).
-- **Board so Spotlight bannerom** presvitá cez priehľadné menu → `nav-content-container` Boardu pri otvorenej stránke
-  Offline vypíname cez `display:none` (`visibility` si potomkovia prepíšu a pri `opacity` karusel pod stránkou
-  ďalej animuje a WebKit prekresľuje).
-- **WebKitGTK blikanie pri hoveri:** prechodové animácie `opacity`/`outline` na hover vytvoria a zrušia grafickú
-  vrstvu → dve bliknutia. Hover efekty sú preto okamžité (bez `transition`), rámik plagátu cez `box-shadow`.
-  Zabudovaný prehliadač na testovanie je Chromium, takže toto sa dá overiť iba v samotnej appke.
-- **Blikanie celej appky pri hoveri/scrollovaní** je chyba samotného Stremia pre Linux (WebKitGTK,
-  stremio-linux-shell #61, #67), nie tohto projektu. `install.sh` vie pridať premenné cez `STREMIO_ENV`
-  (predvolene žiadne). Vyskúšané na Intel Iris Xe + RTX 3050: `WEBKIT_DISABLE_DMABUF_RENDERER=1` → extrémne sekanie
-  a čierne/miznúce časti UI, preto sa nepoužíva.
-  Analýza screencastu (snímka po snímke): pri hoveri sa v oblasti plagátu na jednu snímku vráti starší obsah
-  (zelená ikona → sivá → zelená), t. j. displej ukáže zastaraný buffer len v časti okna. Kandidát:
-  `STREMIO_ENV="GDK_DISABLE=offload" ./install.sh` (GTK neposiela obraz WebKitu cez samostatnú subsurface,
-  zloží ho sám; hardvérové vykresľovanie ostáva). Výsledok: blikanie ostalo, vrátené. Nechávame pôvodné spúšťanie. Wrapper `/app/bin/stremio` pri `/dev/nvidia0` sám nastaví
-  `GSK_RENDERER=opengl`, takže túto premennú cez `--env` prepísať nejde (len obídením wrappera).
-- **Tlačidlo play** kopíruje štandard Stremia z plagátov: 56 px kruh, `rgba(12,11,17,.4)`, vnútorný okraj
-  2.1 px `rgba(255,255,255,.9)`, ikona 32 px — vlastný zaoblený trojuholník v proporciách ikony Stremia
-  (sada stremio-icons nemá licenciu, preto ju nekopírujeme; optické posunutie je v tvare, nie v `margin`).
-- **Úzke okno (< 640 px):** bočné menu sa stane lištou dole → `placePage()` počíta polohu z oboch líšt.
-- **Globálne `overflow: hidden`** v CSS Stremia — vlastné kontajnery, ktoré majú presahovať, treba povoliť.
-- **`requestAnimationFrame` v skrytom okne nebeží** → MutationObserver plánuje cez `setTimeout`.
-- **Odkaz na stream** `#/player/{enc}/{streamTransportUrl}/{metaTransportUrl}/{type}/{id}/{videoId}`;
-  trailer má len `{enc}`. Pole `sources` z addonu je v serializovanom streame ako `announce`.
-- **Meta pre id** Stremio pýta od všetkých addonov a zobrazí prvé hotové v poradí addonov (Cinemeta býva prvá).
-- Streaming server vie aj `GET /{hash}/{idx}?external=1&download=1` (súbor ako príloha) a torrent si vytvorí sám.
+## Stremio 5 (web UI) quirks this project works around
 
-## Priečinok na sťahovanie
+- **Navigation uses `history.pushState`**, which fires no `hashchange`. `inject.js` wraps pushState/replaceState
+  (`watchRoute`) and also checks the URL every 500 ms.
+- **Class names are hashed CSS modules** (`nav-tab-button-tW6qT`) and change with every build → always select with
+  `[class*="vertical-nav-bar"]` and similar.
+- **Never toggle classes on React-managed elements** (e.g. `selected` in the menu) — React may not restore them.
+  The highlight is overridden with CSS through a class on `<html>` (`sdl-offline-open`).
+- **The Offline page lives at `#/?offline=1`** (the Board with a parameter), because an unknown route shows
+  "Page not found" without the menu. `#/downloads` belongs to Stremio's native downloader (paid Supporter accounts
+  only — do not touch it).
+- **The Board's Spotlight banner shows through the transparent menu bars** → the Board's `nav-content-container` is
+  hidden with `display:none` while Offline is open (`visibility` is overridden by descendants, and with `opacity` the
+  carousel keeps animating underneath and WebKit keeps repainting).
+- **Narrow window (< 640 px):** the side menu becomes a bottom bar → `placePage()` positions the page from both bars.
+- **Global `overflow: hidden`** in Stremio's CSS — own containers that should overflow must allow it explicitly.
+- **`requestAnimationFrame` does not run in a hidden window** → the MutationObserver schedules with `setTimeout`.
+- **WebKitGTK hover flicker:** `opacity`/`outline` transitions on hover create and drop a compositing layer → two
+  flashes. Hover effects are instant (no `transition`), the poster ring uses `box-shadow`.
+- **App-wide flicker on hover/scroll on Linux** is a bug of Stremio's Linux app itself (WebKitGTK,
+  stremio-linux-shell #61, #67), not of this project. A screencast analysed frame by frame shows the display briefly
+  presenting an older buffer in the changed area. Tried on Intel Iris Xe + RTX 3050:
+  `WEBKIT_DISABLE_DMABUF_RENDERER=1` → heavy stutter and black/missing areas (do not use);
+  `GDK_DISABLE=offload` → no change. `install.sh` can still pass variables with `STREMIO_ENV` (default: none).
+  The flatpak wrapper `/app/bin/stremio` sets `GSK_RENDERER=opengl` itself when `/dev/nvidia0` exists, so that
+  variable cannot be overridden with `--env`.
+- **Play button** follows Stremio's poster button: 56 px circle, `rgba(12,11,17,.4)`, 2.1 px inner ring
+  `rgba(255,255,255,.9)`, 32 px icon — an original rounded triangle in the proportions of Stremio's icon (the
+  stremio-icons set has no license, so it is not copied; the optical offset is in the shape, not in `margin`).
+- **Stream links** are `#/player/{enc}/{streamTransportUrl}/{metaTransportUrl}/{type}/{id}/{videoId}`; a trailer has
+  only `{enc}`. The add-on's `sources` field appears as `announce` in the serialized stream.
+- **Meta for an id** is requested from all add-ons; Stremio shows the first ready one in add-on order (Cinemeta is
+  usually first).
+- The streaming server also supports `GET /{hash}/{idx}?external=1&download=1` (file as attachment) and creates the
+  torrent by itself.
 
-- `settings.downloadDir()` sa volá pri štarte sťahovania, pri `/info` (stránka Settings sa obnovuje každých 1,5 s)
-  a pri štarte servera. Ak vlastný priečinok neexistuje alebo nie je zapisovateľný, nastavenie sa zmaže
-  (= predvolený) a uloží sa vysvetlenie — používateľ chcel po pripojení HDD vyberať priečinok ručne.
-- Rozpracované sťahovanie má cestu pevne v `item.file`; pri odpojenom disku skončí chybou a po pripojení sa dá obnoviť.
-- Stiahnuté položky na odpojenom disku majú `available: false` (stav sa nemení na chybu); addon ich nevracia.
-  `missing` rozlišuje `disconnected` (prvý existujúci nadradený priečinok je `/run/media/<user>`, `/media/<user>`,
-  `/mnt`…) a `moved` (disk je pripojený, súbor presunutý/zmazaný mimo Stremia).
-- Presunuté stiahnuté súbory: po každom prehľadaní knižnice `downloads.adoptMoved()` nájde súbor s rovnakým názvom
-  a veľkosťou v knižnici a zruší záznam o sťahovaní (súbory sa nemenia) — titul sa ďalej zobrazuje z knižnice.
-  Nenájdené presunuté súbory ponúkne stránka Offline odstrániť zo zoznamu (`POST /__dl/api/downloads/forget-moved`).
-- Knižnica priečinkov preskočí súbory spravované sťahovaním (`library.setExclude`), aby sa neukázali dvakrát.
+## Download folder
 
-## Knižnica priečinkov
+- `settings.downloadDir()` is evaluated when a download starts, on `/info` (the Settings page refreshes every 1.5 s)
+  and at server start. If the custom folder is missing or not writable, the setting is cleared (= default) and an
+  explanation is stored — the user picks the drive again after connecting it.
+- A running download keeps its path in `item.file`; on a disconnected drive it fails and can be resumed later.
+- Downloads on a disconnected drive get `available: false` (the status is not changed to an error) and the add-on
+  does not return them. `missing` tells `disconnected` (the first existing parent is `/run/media/<user>`,
+  `/media/<user>`, `/mnt`, `/Volumes`, or a missing Windows drive letter) from `moved` (the drive is there, the file
+  was moved or deleted outside Stremio).
+- Moved downloads: after every library scan `downloads.adoptMoved()` looks for a file with the same name and size in
+  the library and drops the download record (files are not touched) — the title is then shown from the library.
+  Moved files that are not found can be removed from the list (`POST /__dl/api/downloads/forget-moved`).
+- The library skips files managed by downloads (`library.setExclude`) so they are not shown twice.
 
-- Pripojenie/odpojenie disku: `checkMounts()` každých 5 s porovná podpis priečinkov (`dev:ino` alebo `missing`);
-  pri zmene spustí `scanAll()`. Počas prehľadávania sa zmena zaradí (`rescanPending`).
-- Prázdny priečinok na inom zariadení ako pri poslednom prehľadaní = prázdny bod pripojenia → `available: false`,
-  súbory sa nezahodia.
-- `effectiveKind()`: typ Auto podľa názvu priečinka; `parseAll()`: súrodenci s číslom na konci → epizódy.
-- Názvy v tvare `dva-a-pul-chlapa-s05e04-2003` (pomlčky namiesto medzier) sa čítajú ako slová; rok sa pri epizódach
-  hľadá v celom názve súboru. Cinemeta hľadá aj podľa lokálnych názvov a rok rozhodne o zhode.
-- Nespárované súbory sa pri každom prehľadaní skúsia znova (výsledky vyhľadávania sú v `library.json → matches`,
-  neúspešné sa opakujú najskôr po 24 h).
-- Cinemeta nenájde všetko (napr. slovenský seriál „Profesionáli“, skratky ako „AOT“) — také tituly ostanú lokálne
-  (`local:` id) a hrajú sa s názvom zo súboru.
+## Library folders
 
-## macOS a Windows
+- Drive (un)plug: `checkMounts()` compares a signature of every folder (`dev:ino` or `missing`) every 5 s and runs
+  `scanAll()` on a change. Changes during a scan are queued (`rescanPending`).
+- An empty folder on a different device than at the last scan is treated as an empty mount point →
+  `available: false`, files are kept.
+- `effectiveKind()`: Auto mode by folder name (Movies/Filmy → movies, Series/Seriály/Shows → series);
+  `parseAll()`: siblings that differ only by a trailing number are episodes.
+- Slug names like `dva-a-pul-chlapa-s05e04-2003` (dashes instead of spaces) are read as words; for episodes the year
+  is searched in the whole file name. Cinemeta search also knows local titles and the year decides the match
+  (the first result is accepted when the year matches).
+- Unmatched files are retried on every scan (search results are cached in `library.json → matches`; failures are
+  retried after 24 h at the earliest).
+- Cinemeta does not find everything (e.g. the Slovak series *Profesionáli*, abbreviations like *AOT*) — such titles
+  stay local (`local:` ids) and play with the file name as title.
 
-Zistené z aplikácií (macOS: rozbalené `Stremio_x64.dmg` 5.1.26, iba čítanie textov z binárky; Windows: zdrojový
-kód stremio-shell-ng):
+## macOS and Windows
 
-- Obe aplikácie sú v Ruste s mpv a majú prepínač **`--webui-url`** (macOS aj env `WEBUI_URL`), ďalej `--server-url`,
-  `--start-hidden`, `--hide-splash`… macOS používa WKWebView a IPC `window.webkit.messageHandlers.ipc`, Windows WebView2.
-  Windows dôveruje IPC správam z originu `--webui-url` (overené v kóde `same_origin`), macOS pravdepodobne rovnako.
-- Predvolené UI je `https://web.stremio.com/#/?streamingServerUrl=…` → origin `web.stremio.com`, takže prihlásenie
-  sa pri vlastnom UI zachovať nedá (raz sa treba prihlásiť znova). Preto na macOS/Windows nepoužívame proxy
-  streaming servera ani HTTPS (`ENABLE_HTTPS=0`) a UI ide priamo z `http://127.0.0.1:11488/`.
-- macOS má v `Stremio.app/Contents/MacOS/` vlastný `node` (v16.20.2) a `server.js`; Node 16 nestačí (chýba `fetch`,
-  `AbortSignal.any`…), preto `lib/node-check.js` vyžaduje Node 20+.
-- macOS nemá D-Bus aktiváciu ani systemd socket aktiváciu. Bežná ikona Stremia sa rieši cez premennú prostredia:
-  pri všetkých prepínačoch Mac aplikácie sú v binárke aj názvy env (`START_HIDDEN`, `STAGING`, `WEBUI_URL`… — aj pri
-  booleovských prepínačoch, ktoré nemajú `value_name`, takže ide o clap `env`). `launchctl setenv WEBUI_URL …` platí
-  pre aplikácie spúšťané z Docku/Findera. Nastavuje ju LaunchAgent `community.offline-stremio`
-  (`macos/offline-stremio-agent.sh`), ktorý zároveň každú sekundu pozrie (`pgrep`), či beží Stremio, a spustí
-  pomocníka s `IDLE_EXIT=1`. Mac shell (ako shell-ng) načíta UI až po štarte svojho streaming servera, čo dáva
-  pomocníkovi čas. Overené len simuláciou na Linuxe (falošný proces Stremia, zástupný `launchctl`).
-- Záloha `./install-macos.sh --launcher`: aplikácia `~/Applications/Stremio Offline.app`, ktorá spustí pomocníka
-  a `open -a Stremio --args --webui-url=…` (keď Stremio beží bez prepínača, ponúkne reštart).
-- Windows (shell-ng) `--webui-url` z env nečíta → bude treba upraviť/pridať zástupcu.
-- `lib/config.js` / `lib/fsbrowse.js` / `lib/downloads.js` majú vetvy pre `darwin` a `win32` (cesty, `/Volumes`,
-  písmená diskov, výber priečinka cez `osascript` / PowerShell). Windows inštalátor zatiaľ chýba.
-- Netestované na skutočnom Macu ani Windowse. Na Linuxe sa dá „Mac režim“ vyskúšať:
-  `ENABLE_HTTPS=0 IDLE_EXIT=1 PORT=11590 DATA_DIR=/tmp/x node server.js` a otvoriť `http://127.0.0.1:11590/`.
+Found in the apps (macOS: the unpacked `Stremio_x64.dmg` 5.1.26, read-only string inspection of the binary;
+Windows: the stremio-shell-ng source code):
 
-## Nápady na ďalšiu prácu
+- Both apps are written in Rust with mpv and have **`--webui-url`**, plus `--server-url`, `--start-hidden`,
+  `--hide-splash`… macOS uses WKWebView with the IPC handler `window.webkit.messageHandlers.ipc`, Windows WebView2.
+  Windows trusts IPC messages from the origin of `--webui-url` (`same_origin` in the source); macOS probably as well.
+- The default UI is `https://web.stremio.com/#/?streamingServerUrl=…` → origin `web.stremio.com`, so the login cannot
+  be kept with a custom UI (log in once more). That is why macOS/Windows use neither the streaming server proxy nor
+  HTTPS (`ENABLE_HTTPS=0`): the UI comes directly from `http://127.0.0.1:11488/`.
+- macOS bundles its own `node` (v16.20.2) and `server.js` in `Stremio.app/Contents/MacOS/`; Node 16 is too old
+  (no `fetch`, `AbortSignal.any`…), hence `lib/node-check.js` requires Node 20+.
+- macOS has neither D-Bus activation nor socket activation usable from Node. The normal Stremio icon works through an
+  environment variable: the binary contains env names for all options (`START_HIDDEN`, `STAGING`, `WEBUI_URL`… — also
+  for boolean flags, which have no `value_name`, so these are clap `env` attributes). `launchctl setenv WEBUI_URL …`
+  applies to apps started from the Dock/Finder. It is set by the LaunchAgent `community.offline-stremio`
+  (`macos/offline-stremio-agent.sh`), which also checks every second (`pgrep`) whether Stremio runs and then starts
+  the helper with `IDLE_EXIT=1`. The Mac shell (like shell-ng) loads the UI only after its streaming server has
+  started, which gives the helper time. Verified only by simulation on Linux (fake Stremio process, stubbed
+  `launchctl`).
+- Fallback `install-macos.sh --launcher`: the app `~/Applications/Stremio Offline.app` starts the helper and
+  `open -a Stremio --args --webui-url=…` (offers a restart when Stremio already runs without it).
+- Windows (shell-ng) does not read `--webui-url` from the environment → the installer will have to change or add a
+  shortcut.
+- `lib/config.js`, `lib/fsbrowse.js` and `lib/downloads.js` already have branches for `darwin` and `win32` (paths,
+  `/Volumes`, drive letters, folder picker via `osascript` / PowerShell). A Windows installer is still missing.
 
-- Windows: inštalátor (PowerShell) — zástupca „Stremio Offline“ so `--webui-url`, pomocník s `IDLE_EXIT=1`.
+## Ideas
 
-- Ručné priradenie titulu pre nespárované položky (vyhľadať v Stremiu alebo vložiť IMDb id).
-
-- **Verzia pre Windows/macOS bez zásahu do Stremia:** rovnaký server ako lokálny addon + malá aplikácia v lište
-  (ako streaming server Stremia). Fungovalo by: vlastné priečinky/HDD, sťahovanie (položky „⬇ Save offline“
-  v zozname streamov, zdrojový addon sa zadá v nastaveniach), katalógy „Offline“, prehrávanie offline.
-  Nefungovalo by: položka v menu a štart UI bez internetu (to vyžaduje zmenu spúšťania Stremia).
-  Pri prístupe z `https://web.stremio.com` na `127.0.0.1` treba odpovedať aj na Private Network Access preflight
-  (`Access-Control-Allow-Private-Network: true`). Na Windows/Mac netestované.
-- **Čisto online addon „⬇ Download“** (bez inštalácie): streamy s `externalUrl` na `:11470/{hash}/{idx}?external=1&download=1`
-  alebo debrid URL → stiahne prehliadač; prehrávanie potom cez vstavaný „Local files“ addon Stremia
-  (Windows Search / Spotlight / na Linuxe iba domovský priečinok).
-- Lokálne (CZ/SK) názvy titulov namiesto anglických z Cinemety.
-- Čistenie `web-cache` od starých buildov web UI.
+- Windows installer (PowerShell): a "Stremio Offline" shortcut with `--webui-url`, helper with `IDLE_EXIT=1`.
+- Manually assign a title to unmatched items (search in Stremio or paste an IMDb id).
+- An add-on-only variant without touching Stremio's start: the same helper as a local add-on + a tray app. It would
+  keep own folders/HDD, downloads (as "⬇ Save offline" streams with a configured source add-on), the "Offline"
+  catalogs and offline playback, but lose the menu item and the offline start of the UI. Requests from
+  `https://web.stremio.com` to `127.0.0.1` also need the Private Network Access preflight
+  (`Access-Control-Allow-Private-Network: true`).
+- A pure online "⬇ Download" add-on (no install): streams with `externalUrl` pointing to
+  `:11470/{hash}/{idx}?external=1&download=1` or debrid URLs → the browser downloads them; playback through Stremio's
+  built-in "Local files" add-on (Windows Search / Spotlight / home folder on Linux).
+- Local (CZ/SK) titles instead of the English ones from Cinemeta.
+- Clean old web UI builds from `web-cache`.
