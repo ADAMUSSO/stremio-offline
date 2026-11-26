@@ -103,7 +103,8 @@ STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x
   zloží ho sám; hardvérové vykresľovanie ostáva). Výsledok: blikanie ostalo, vrátené. Nechávame pôvodné spúšťanie. Wrapper `/app/bin/stremio` pri `/dev/nvidia0` sám nastaví
   `GSK_RENDERER=opengl`, takže túto premennú cez `--env` prepísať nejde (len obídením wrappera).
 - **Tlačidlo play** kopíruje štandard Stremia z plagátov: 56 px kruh, `rgba(12,11,17,.4)`, vnútorný okraj
-  2.1 px `rgba(255,255,255,.9)`, ikona 32 px zo stremio-icons (optické posunutie je v tvare, nie v `margin`).
+  2.1 px `rgba(255,255,255,.9)`, ikona 32 px — vlastný zaoblený trojuholník v proporciách ikony Stremia
+  (sada stremio-icons nemá licenciu, preto ju nekopírujeme; optické posunutie je v tvare, nie v `margin`).
 - **Úzke okno (< 640 px):** bočné menu sa stane lištou dole → `placePage()` počíta polohu z oboch líšt.
 - **Globálne `overflow: hidden`** v CSS Stremia — vlastné kontajnery, ktoré majú presahovať, treba povoliť.
 - **`requestAnimationFrame` v skrytom okne nebeží** → MutationObserver plánuje cez `setTimeout`.

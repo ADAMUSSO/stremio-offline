@@ -10,6 +10,14 @@ Inšpirované [BurningSands70/stremio-downloader](https://github.com/BurningSand
 
 Vývoj a architektúra: [DEVELOPMENT.md](DEVELOPMENT.md).
 
+> **Neoficiálny projekt.** Nie je spojený so Stremiom ani ním podporovaný; „Stremio“ je ochranná známka jeho vlastníkov.
+> Projekt neobsahuje ani neodporúča žiadne zdroje obsahu — sťahuje len to, čo už prehrávaš cez svoje addony,
+> a za obsah, ktorý si stiahneš, zodpovedáš ty (podľa zákonov svojej krajiny). Natívny downloader Stremia
+> pre platené účty neodomyká ani nemení.
+>
+> *Unofficial project, not affiliated with or endorsed by Stremio. It ships no content sources; you are responsible
+> for what you download.*
+
 **Požiadavky:** Linux so Stremiom z Flathubu (`com.stremio.Stremio`), Node.js 20+, `openssl`, voliteľne `ffmpeg` (HLS streamy)
 a `zenity` (systémové okno na výber priečinka). Bez externých npm balíkov.
 
