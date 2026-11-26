@@ -11,6 +11,12 @@ NODE="$(readlink -f "$(command -v node || true)" 2>/dev/null || true)"
 PORT="${PORT:-11488}"
 HTTPS_PORT="$((PORT + 1))"
 APP_URL="http://127.0.0.1:11470/proxy/d=https%3A%2F%2F127.0.0.1%3A${HTTPS_PORT}/"
+# Premenné prostredia pre Stremio (medzerou oddelené). WebKitGTK v Stremiu pre Linux pri hoveri/scrollovaní bliká
+# (stremio-linux-shell #61, #67), najmä na notebookoch s NVIDIA — vypnutie DMA-BUF rendereru to rieši.
+# Vlastné nastavenie: STREMIO_ENV="..." ./install.sh, bez úprav: STREMIO_ENV="" ./install.sh
+STREMIO_ENV="${STREMIO_ENV-WEBKIT_DISABLE_DMABUF_RENDERER=1}"
+ENV_ARGS=""
+for kv in $STREMIO_ENV; do ENV_ARGS+="--env=$kv "; done
 UNIT_DIR="$HOME/.config/systemd/user"
 DBUS_DIR="$HOME/.local/share/dbus-1/services"
 
@@ -50,7 +56,7 @@ EOF
 cat > "$DBUS_DIR/com.stremio.Stremio.service" <<EOF
 [D-BUS Service]
 Name=com.stremio.Stremio
-Exec=/usr/bin/flatpak run --branch=stable --arch=x86_64 --command=/app/bin/stremio com.stremio.Stremio --url $APP_URL --gapplication-service
+Exec=/usr/bin/flatpak run --branch=stable --arch=x86_64 ${ENV_ARGS}--command=/app/bin/stremio com.stremio.Stremio --url $APP_URL --gapplication-service
 EOF
 
 systemctl --user daemon-reload
@@ -63,5 +69,6 @@ echo "Installed."
 echo "  Stremio UI:  $APP_URL"
 echo "  add-on:      http://127.0.0.1:$PORT/addon/manifest.json"
 echo "  status:      systemctl --user status stremio-offline.socket stremio-offline.service"
+[[ -n "$STREMIO_ENV" ]] && echo "  Stremio env: $STREMIO_ENV"
 echo
 echo "Quit Stremio completely (also from the tray) and start it again."

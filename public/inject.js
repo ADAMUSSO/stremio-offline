@@ -29,7 +29,8 @@
         pause: icon(path('M176 112v288M336 112v288')),
         retry: icon(path('M96 256a160 160 0 1 0 48-114M96 96v96h96')),
         trash: icon(path('M112 144h288M208 144v-40h96v40m-160 0 20 280h184l20-280M224 216v144m64-144v144')),
-        play: '<svg viewBox="0 0 512 512" aria-hidden="true"><path d="M152 96v320l272-160z" fill="currentColor"/></svg>',
+        // rovnaká ikona ako na plagátoch Stremia (optické posunutie je priamo v tvare, svg ostáva v strede)
+        play: '<svg viewBox="0 0 512 512" aria-hidden="true"><path d="M396.097 246.1 164.194 85.5a13.5 13.5 0 0 0-4.787-2.08c-1.717-.37-3.492-.4-5.219-.07-1.728.3-3.377.97-4.852 1.91a13.4 13.4 0 0 0-3.743 3.64 13.7 13.7 0 0 0-2.4 7.61v321.4a13.3 13.3 0 0 0 1.029 5.1 13.2 13.2 0 0 0 2.909 4.32 13.4 13.4 0 0 0 4.347 2.89c1.624.65 3.363 1 5.116.98 2.723.03 5.382-.82 7.6-2.39l231.903-160.6c1.448-1 2.684-2.28 3.64-3.75a13.4 13.4 0 0 0 1.925-4.85c.316-1.72.287-3.51-.084-5.22a13.2 13.2 0 0 0-2.08-4.78 13.8 13.8 0 0 0-3.401-3.41z" fill="currentColor"/></svg>',
         info: icon(path('M256 232v120'), path('M256 160h.01', ';stroke-width:44'), path('M256 64a192 192 0 1 0 0 384 192 192 0 0 0 0-384z')),
         plug: icon(path('M192 64v96m128-96v96M144 160h224v64a112 112 0 0 1-224 0zm112 176v112')),
         folder: icon(path('M64 144v232a40 40 0 0 0 40 40h304a40 40 0 0 0 40-40V200a40 40 0 0 0-40-40H260l-48-48H104a40 40 0 0 0-40 40z')),
@@ -106,10 +107,11 @@
     .sdl-card:hover .sdl-poster{box-shadow:0 0 0 2px rgba(255,255,255,.9)}
     .sdl-poster img{width:100%;height:100%;object-fit:cover;display:block}
     .sdl-poster .sdl-noimg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:1rem;text-align:center;font-weight:600}
-    .sdl-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(12,11,17,.45);opacity:0}
+    .sdl-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(12,11,17,.25);opacity:0}
     .sdl-card:hover .sdl-play{opacity:1}
-    .sdl-play span{width:3.5rem;height:3.5rem;border-radius:50%;background:#7b5bf5;color:#fff;display:flex;align-items:center;justify-content:center}
-    .sdl-play svg{width:1.4rem;height:1.4rem;margin-left:.2rem}
+    .sdl-play span{width:3.5rem;height:3.5rem;border-radius:50%;background:rgba(12,11,17,.4);box-shadow:inset 0 0 0 2.1px rgba(255,255,255,.9);
+      color:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center}
+    .sdl-play svg{width:2rem;height:2rem}
     .sdl-tag{position:absolute;left:.5rem;top:.5rem;padding:.25rem .5rem;border-radius:.4rem;background:rgba(12,11,17,.8);font-size:.75rem;font-weight:700}
     .sdl-card-actions{position:absolute;right:.4rem;top:.4rem;display:flex;gap:.25rem;opacity:0}
     .sdl-card:hover .sdl-card-actions{opacity:1}
@@ -141,8 +143,8 @@
     .sdl-ep:hover{background:rgba(255,255,255,.08)}
     .sdl-ep .sdl-thumb{grid-row:1/3;position:relative;aspect-ratio:16/9;border-radius:.5rem;overflow:hidden;background:rgba(255,255,255,.06)}
     .sdl-ep .sdl-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-    .sdl-ep .sdl-play span{width:2.4rem;height:2.4rem}
-    .sdl-ep .sdl-play svg{width:1rem;height:1rem}
+    .sdl-ep .sdl-play span{width:2.4rem;height:2.4rem;box-shadow:inset 0 0 0 1.6px rgba(255,255,255,.9)}
+    .sdl-ep .sdl-play svg{width:1.35rem;height:1.35rem}
     .sdl-ep:hover .sdl-play{opacity:1}
     .sdl-ep .sdl-title{font-weight:600;align-self:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .sdl-ep .sdl-sub{grid-column:2;align-self:start;color:rgba(255,255,255,.5);font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
