@@ -20,6 +20,7 @@ import * as fsbrowse from './lib/fsbrowse.js'
 import * as settings from './lib/settings.js'
 
 library.setExclude(p => downloads.isDownloadFile(p))
+library.setOnScanned(files => downloads.adoptMoved(files))
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'public')
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`, `127.0.0.1:${HTTPS_PORT}`, `localhost:${HTTPS_PORT}`])
@@ -92,6 +93,7 @@ async function handleApi(req, res, pathname) {
         }
     }
     if (m && !m[1] && req.method === 'GET') return reply(200, downloads.list().map(addon.decorateItem))
+    if (pathname === '/__dl/api/downloads/forget-moved' && req.method === 'POST') return reply(200, { forgotten: await downloads.forgetMoved() })
 
     // --- lokálna knižnica (priečinky na disku) ---
     if (pathname === '/__dl/api/library' && req.method === 'GET') {

@@ -154,6 +154,8 @@
     .sdl-hint{color:rgba(255,255,255,.55);font-size:.9rem;margin:.75rem 0 0;line-height:1.55}
     .sdl-hint b{color:rgba(255,255,255,.8);font-weight:600}
     .sdl-note{margin-top:1rem;padding:.75rem 1rem;border-radius:.75rem;background:rgba(255,180,0,.1);color:#ffd27a;font-size:.9rem}
+    .sdl-note-row{display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+    .sdl-note-row span{flex:1;min-width:14rem}
     .sdl-primary{background:#7b5bf5}
     .sdl-primary:hover{background:#8d70ff}
     .sdl-grow{flex:1}
@@ -411,9 +413,14 @@
                 <button class="sdl-pill" data-act="addon">${ICON.plug}Install add-on</button></div>`
         }
         if (missing.length) head += `<div class="sdl-note">Not connected: ${missing.map(f => esc(f.path)).join(', ')}. Its videos come back when the disk is connected.</div>`
-        const offDisk = items.filter(i => i.status === 'done' && i.available === false).length
+        const unavailable = items.filter(i => i.status === 'done' && i.available === false)
+        const offDisk = unavailable.filter(i => i.missing !== 'moved').length
+        const moved = unavailable.length - offDisk
         if (offDisk) head += `<div class="sdl-note">${plural(offDisk, 'downloaded video is', 'downloaded videos are')} on a disk that is not connected. ${offDisk === 1 ? 'It comes' : 'They come'} back when you connect it.</div>`
-        if (!done.length && !active.length && !offDisk) {
+        if (moved) head += `<div class="sdl-note sdl-note-row"><span>${plural(moved, 'downloaded video was', 'downloaded videos were')} moved or deleted outside Stremio.
+            If you moved ${moved === 1 ? 'it' : 'them'} into a library folder, ${moved === 1 ? 'it shows' : 'they show'} up there automatically.</span>
+            <button class="sdl-pill" data-act="forget-moved" title="Only removes the entries, no files are touched">Remove from list</button></div>`
+        if (!done.length && !active.length && !unavailable.length) {
             head += `<div class="sdl-empty">${ICON.offline}<br>Nothing here yet.<br>Press ⬇ next to a stream to download it, or add a folder with movies or series from your disk.<br><br>
                 <button class="sdl-pill sdl-primary" data-act="folders">${ICON.folder}Add a folder</button></div>`
         }
@@ -680,6 +687,9 @@
                 const { path } = await api('/fs/pick', { method: 'POST', body: JSON.stringify({ start: browse?.path || null }) })
                 if (path) return loadBrowse(path)
                 return
+            } else if (act === 'forget-moved') {
+                const { forgotten } = await api('/downloads/forget-moved', { method: 'POST' })
+                toast(`Removed ${plural(forgotten, 'entry', 'entries')} from the list. No files were touched.`)
             } else if (act === 'choose-download-dir') {
                 // prehliadač sa prepne na výber priečinka na sťahovanie, začne pri pripojených diskoch
                 browse = { ...(browse || {}), mode: 'downloads' }

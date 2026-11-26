@@ -119,6 +119,11 @@ STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x
   (= predvolený) a uloží sa vysvetlenie — používateľ chcel po pripojení HDD vyberať priečinok ručne.
 - Rozpracované sťahovanie má cestu pevne v `item.file`; pri odpojenom disku skončí chybou a po pripojení sa dá obnoviť.
 - Stiahnuté položky na odpojenom disku majú `available: false` (stav sa nemení na chybu); addon ich nevracia.
+  `missing` rozlišuje `disconnected` (prvý existujúci nadradený priečinok je `/run/media/<user>`, `/media/<user>`,
+  `/mnt`…) a `moved` (disk je pripojený, súbor presunutý/zmazaný mimo Stremia).
+- Presunuté stiahnuté súbory: po každom prehľadaní knižnice `downloads.adoptMoved()` nájde súbor s rovnakým názvom
+  a veľkosťou v knižnici a zruší záznam o sťahovaní (súbory sa nemenia) — titul sa ďalej zobrazuje z knižnice.
+  Nenájdené presunuté súbory ponúkne stránka Offline odstrániť zo zoznamu (`POST /__dl/api/downloads/forget-moved`).
 - Knižnica priečinkov preskočí súbory spravované sťahovaním (`library.setExclude`), aby sa neukázali dvakrát.
 
 ## Knižnica priečinkov
@@ -128,6 +133,10 @@ STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x
 - Prázdny priečinok na inom zariadení ako pri poslednom prehľadaní = prázdny bod pripojenia → `available: false`,
   súbory sa nezahodia.
 - `effectiveKind()`: typ Auto podľa názvu priečinka; `parseAll()`: súrodenci s číslom na konci → epizódy.
+- Názvy v tvare `dva-a-pul-chlapa-s05e04-2003` (pomlčky namiesto medzier) sa čítajú ako slová; rok sa pri epizódach
+  hľadá v celom názve súboru. Cinemeta hľadá aj podľa lokálnych názvov a rok rozhodne o zhode.
+- Nespárované súbory sa pri každom prehľadaní skúsia znova (výsledky vyhľadávania sú v `library.json → matches`,
+  neúspešné sa opakujú najskôr po 24 h).
 - Cinemeta nenájde všetko (napr. slovenský seriál „Profesionáli“, skratky ako „AOT“) — také tituly ostanú lokálne
   (`local:` id) a hrajú sa s názvom zo súboru.
 
