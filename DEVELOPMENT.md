@@ -46,7 +46,8 @@ takže prihlásenie, knižnica a addony ostanú. Shell vkladá svoj IPC skript (
 | `lib/node-check.js` | kontrola Node 20+ (prvý import v `server.js`) |
 | `public/inject.js` | celé UI v Stremiu (vanilla JS + CSS v jednom súbore) |
 | `install.sh` / `uninstall.sh` | Linux: systemd socket + služba, D-Bus override |
-| `install-macos.sh` / `uninstall-macos.sh` | macOS: spúšťač `Stremio Offline.app` |
+| `install-macos.sh` / `uninstall-macos.sh` | macOS: LaunchAgent + `WEBUI_URL`, voliteľne spúšťač `Stremio Offline.app` |
+| `macos/offline-stremio-agent.sh` | macOS strážca: nastaví `WEBUI_URL`, so Stremiom spustí pomocníka |
 | `dev/` | nástroje na vývoj (nižšie) |
 
 Dáta: `~/.local/share/stremio-offline/` — `downloads.json`, `library.json`, `settings.json`, `meta/`, `img/`, `web-cache/`, `tls/`, `addon-seen`.
@@ -156,9 +157,16 @@ kód stremio-shell-ng):
   streaming servera ani HTTPS (`ENABLE_HTTPS=0`) a UI ide priamo z `http://127.0.0.1:11488/`.
 - macOS má v `Stremio.app/Contents/MacOS/` vlastný `node` (v16.20.2) a `server.js`; Node 16 nestačí (chýba `fetch`,
   `AbortSignal.any`…), preto `lib/node-check.js` vyžaduje Node 20+.
-- macOS nemá D-Bus aktiváciu → `install-macos.sh` vytvorí spúšťač `~/Applications/Stremio Offline.app`
-  (skript): spustí pomocníka s `IDLE_EXIT=1` a potom `open -a Stremio --args --webui-url=…`. Keď Stremio už beží
-  bez tohto prepínača, `--args` by sa ignorovalo → spúšťač ponúkne reštart.
+- macOS nemá D-Bus aktiváciu ani systemd socket aktiváciu. Bežná ikona Stremia sa rieši cez premennú prostredia:
+  pri všetkých prepínačoch Mac aplikácie sú v binárke aj názvy env (`START_HIDDEN`, `STAGING`, `WEBUI_URL`… — aj pri
+  booleovských prepínačoch, ktoré nemajú `value_name`, takže ide o clap `env`). `launchctl setenv WEBUI_URL …` platí
+  pre aplikácie spúšťané z Docku/Findera. Nastavuje ju LaunchAgent `community.offline-stremio`
+  (`macos/offline-stremio-agent.sh`), ktorý zároveň každú sekundu pozrie (`pgrep`), či beží Stremio, a spustí
+  pomocníka s `IDLE_EXIT=1`. Mac shell (ako shell-ng) načíta UI až po štarte svojho streaming servera, čo dáva
+  pomocníkovi čas. Overené len simuláciou na Linuxe (falošný proces Stremia, zástupný `launchctl`).
+- Záloha `./install-macos.sh --launcher`: aplikácia `~/Applications/Stremio Offline.app`, ktorá spustí pomocníka
+  a `open -a Stremio --args --webui-url=…` (keď Stremio beží bez prepínača, ponúkne reštart).
+- Windows (shell-ng) `--webui-url` z env nečíta → bude treba upraviť/pridať zástupcu.
 - `lib/config.js` / `lib/fsbrowse.js` / `lib/downloads.js` majú vetvy pre `darwin` a `win32` (cesty, `/Volumes`,
   písmená diskov, výber priečinka cez `osascript` / PowerShell). Windows inštalátor zatiaľ chýba.
 - Netestované na skutočnom Macu ani Windowse. Na Linuxe sa dá „Mac režim“ vyskúšať:

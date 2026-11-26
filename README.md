@@ -7,8 +7,8 @@ Inšpirované [BurningSands70/stremio-downloader](https://github.com/BurningSand
 > **English summary:** a small local helper for the Stremio 5 desktop app on Linux (flatpak) and macOS. It adds a download
 > button next to every stream, an "Offline" section in Stremio's sidebar (downloads plus movies and series from your own
 > folders/HDD, matched with Cinemeta), offline playback in Stremio's player and an offline-capable UI.
-> Linux: `./install.sh` / `./uninstall.sh`. macOS (untested on real hardware): `./install-macos.sh`, then start
-> "Stremio Offline" from Applications; `./uninstall-macos.sh`. Developer notes are in [DEVELOPMENT.md](DEVELOPMENT.md).
+> Linux: `./install.sh` / `./uninstall.sh`. macOS (untested on real hardware): `./install-macos.sh`, then reopen Stremio
+> as usual; `./uninstall-macos.sh`. Developer notes are in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 Vývoj a architektúra: [DEVELOPMENT.md](DEVELOPMENT.md).
 
@@ -103,15 +103,22 @@ Ak sa zmení cesta k `node` (napr. iná verzia v nvm), spusti `./install.sh` zno
 ./install-macos.sh
 ```
 
-Vytvorí aplikáciu **Stremio Offline** v `~/Applications` (s ikonou Stremia). Spúšťaj Stremio cez ňu — napr. ju presuň
-do Docku namiesto Stremia. Spustí pomocníka a potom Stremio s `--webui-url=http://127.0.0.1:11488/`; ak už Stremio
-beží bez funkcií Offline, ponúkne reštart. Pôvodné Stremio.app sa nemení a dá sa spúšťať aj normálne (bez Offline).
+Rovnako ako na Linuxe nevzniká nová aplikácia — **bežná ikona Stremia** (Dock, Aplikácie) otvorí Stremio s funkciami
+Offline. Inštalátor pridá malého strážcu (LaunchAgent, spúšťa sa pri prihlásení), ktorý:
+
+- nastaví pre aplikácie z Docku/Findera premennú `WEBUI_URL` — Stremio 5 pre macOS ju číta ako `--webui-url`,
+- pri štarte Stremia spustí pomocníka; ten sa sám vypne asi minútu po zatvorení Stremia, keď nič nesťahuje.
+
+Po inštalácii Stremio úplne ukonči (Cmd+Q) a otvor znova. Stremio.app sa nemení.
 
 - Prvý raz sa treba do Stremia znova prihlásiť (rozhranie beží z lokálnej adresy, nie z `web.stremio.com`).
-- Keď sa macOS opýta, či `node` smie čítať externý disk alebo priečinok Stiahnuté, povoľ to.
+- macOS ukáže „Pridaná položka na pozadí“ a môže sa opýtať, či `node` smie čítať externý disk alebo priečinok
+  Stiahnuté — povoľ to (prípadne Nastavenia → Súkromie a bezpečnosť).
 - Predvolené sťahovanie: `~/Movies/Stremio`, dáta: `~/Library/Application Support/stremio-offline`,
-  záznam: `~/Library/Logs/offline-stremio.log`. Disky z `/Volumes` sa zobrazujú medzi skratkami.
-- Pomocník sa vypne asi minútu po zatvorení Stremia, keď nič nesťahuje.
+  záznamy: `~/Library/Logs/offline-stremio*.log`. Disky z `/Volumes` sa zobrazujú medzi skratkami.
+- Keby bežné Stremio funkcie Offline neukázalo (premenná `WEBUI_URL` je zistená z aplikácie, nie overená na Macu),
+  `./install-macos.sh --launcher` pridá aj záložnú aplikáciu **Stremio Offline**, ktorá spúšťa Stremio
+  s `--webui-url` priamo.
 
 ```bash
 ./uninstall-macos.sh
@@ -125,7 +132,7 @@ beží bez funkcií Offline, ponúkne reštart. Pôvodné Stremio.app sa nemení
 | `DOWNLOAD_DIR` | `~/Videos/Stremio`, na macOS `~/Movies/Stremio` (vlastný sa nastavuje v Offline → Settings) |
 | `DATA_DIR` | `~/.local/share/stremio-offline`, na macOS `~/Library/Application Support/stremio-offline` |
 | `ENABLE_HTTPS` | `1` na Linuxe (proxy streaming servera), inak `0` |
-| `IDLE_EXIT` | `1` = vypnúť sa po zatvorení Stremia aj bez systemd (nastavuje spúšťač na macOS) |
+| `IDLE_EXIT` | `1` = vypnúť sa po zatvorení Stremia aj bez systemd (nastavuje strážca na macOS) |
 | `MAX_PARALLEL` | `2` |
 
 Pre samotné Stremio: `STREMIO_ENV` pri inštalácii pridá premenné prostredia do spúšťania Stremia (predvolene žiadne).

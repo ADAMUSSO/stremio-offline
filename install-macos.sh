@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Inštalácia Offline Stremio na macOS
-#  - vytvorí aplikáciu ~/Applications/Stremio Offline.app (spúšťač)
-#  - spúšťač naštartuje pomocníka (node server.js) a potom Stremio s --webui-url na náš server
-#  - Stremio.app sa nemení; pôvodné Stremio sa dá ďalej spúšťať normálne (bez funkcií Offline)
+# Inštalácia Offline Stremio na macOS — bežná ikona Stremia dostane funkcie Offline (ako na Linuxe)
+#  - LaunchAgent pri prihlásení spustí macos/offline-stremio-agent.sh, ktorý:
+#      * nastaví WEBUI_URL pre aplikácie z Docku/Findera (Stremio 5 ju číta ako --webui-url)
+#      * pri štarte Stremia spustí pomocníka (node server.js); ten sa sám vypne po zatvorení Stremia
+#  - Stremio.app sa nemení. Záloha: ./install-macos.sh --launcher vytvorí aj aplikáciu "Stremio Offline",
+#    ktorá spúšťa Stremio s --webui-url priamo (keby premenná WEBUI_URL na niektorom Macu nezabrala)
 # Spustenie: v Termináli v priečinku projektu  ./install-macos.sh   (odinštalovanie: ./uninstall-macos.sh)
 set -euo pipefail
 
@@ -10,9 +12,13 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 PORT="${PORT:-11488}"
+LABEL="community.offline-stremio"
+AGENT_PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LAUNCHER="$HOME/Applications/Stremio Offline.app"
+WITH_LAUNCHER=0
+[[ "${1:-}" == "--launcher" ]] && WITH_LAUNCHER=1
 
-# Node.js 20+ (aplikácia spustená z Findera nemá PATH z Terminálu → uložíme absolútnu cestu)
+# Node.js 20+ (launchd ani Finder nemajú PATH z Terminálu → uložíme absolútnu cestu)
 NODE=""
 for candidate in "$(command -v node || true)" /opt/homebrew/bin/node /usr/local/bin/node; do
     [[ -x "$candidate" ]] || continue
@@ -33,18 +39,50 @@ done
 [[ -n "$APP" ]] || { echo "Stremio.app was not found in /Applications. Install Stremio 5 for macOS first." >&2; exit 1; }
 VERSION="$(defaults read "$APP/Contents/Info" CFBundleShortVersionString 2>/dev/null || echo 0)"
 if [[ "${VERSION%%.*}" -lt 5 ]]; then
-    echo "Stremio $VERSION found, but version 5 or newer is needed (it supports --webui-url)." >&2
+    echo "Stremio $VERSION found, but version 5 or newer is needed (it supports --webui-url / WEBUI_URL)." >&2
     exit 1
 fi
-EXE_NAME="$(defaults read "$APP/Contents/Info" CFBundleExecutable)"
+EXE="$APP/Contents/MacOS/$(defaults read "$APP/Contents/Info" CFBundleExecutable)"
 BUNDLE_ID="$(defaults read "$APP/Contents/Info" CFBundleIdentifier)"
 
-# spúšťač ako malá .app (skript), ikona zo Stremia
-rm -rf "$LAUNCHER"
-mkdir -p "$LAUNCHER/Contents/MacOS" "$LAUNCHER/Contents/Resources"
-cp "$APP/Contents/Resources/AppIcon.icns" "$LAUNCHER/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+chmod +x "$DIR/macos/offline-stremio-agent.sh"
+mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
 
-cat > "$LAUNCHER/Contents/Info.plist" <<EOF
+cat > "$AGENT_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>$LABEL</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>$DIR/macos/offline-stremio-agent.sh</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>OFFLINE_STREMIO_NODE</key><string>$NODE</string>
+        <key>OFFLINE_STREMIO_DIR</key><string>$DIR</string>
+        <key>STREMIO_EXE</key><string>$EXE</string>
+        <key>PORT</key><string>$PORT</string>
+    </dict>
+    <key>RunAtLoad</key><true/>
+    <key>KeepAlive</key><true/>
+    <key>StandardErrorPath</key><string>$HOME/Library/Logs/offline-stremio-agent.log</string>
+</dict>
+</plist>
+EOF
+
+# (re)načítanie agenta — hneď nastaví WEBUI_URL
+launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$AGENT_PLIST"
+
+# voliteľná záloha: samostatná aplikácia, ktorá spúšťa Stremio s --webui-url
+rm -rf "$LAUNCHER"
+if (( WITH_LAUNCHER )); then
+    mkdir -p "$LAUNCHER/Contents/MacOS" "$LAUNCHER/Contents/Resources"
+    cp "$APP/Contents/Resources/AppIcon.icns" "$LAUNCHER/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+    cat > "$LAUNCHER/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -60,34 +98,17 @@ cat > "$LAUNCHER/Contents/Info.plist" <<EOF
 </dict>
 </plist>
 EOF
-
-cat > "$LAUNCHER/Contents/MacOS/stremio-offline" <<EOF
+    cat > "$LAUNCHER/Contents/MacOS/stremio-offline" <<EOF
 #!/bin/bash
-# Spúšťač Offline Stremio: pomocník + Stremio s upraveným rozhraním
-NODE="$NODE"
-DIR="$DIR"
-APP="$APP"
-EXE="\$APP/Contents/MacOS/$EXE_NAME"
-BUNDLE_ID="$BUNDLE_ID"
-PORT="$PORT"
+# Záložný spúšťač: pomocník + Stremio s --webui-url (keď beží bez neho, ponúkne reštart)
+NODE="$NODE"; DIR="$DIR"; APP="$APP"; EXE="$EXE"; BUNDLE_ID="$BUNDLE_ID"; PORT="$PORT"
 URL="http://127.0.0.1:\$PORT/"
 LOG="\$HOME/Library/Logs/offline-stremio.log"
-
 health() { curl -sf -m 1 "http://127.0.0.1:\$PORT/__dl/health" >/dev/null; }
-alert() { osascript -e "display alert \"Stremio Offline\" message \"\$1\"" >/dev/null; }
-
-# 1) pomocník — sám sa vypne asi minútu po zatvorení Stremia (IDLE_EXIT)
 if ! health; then
     IDLE_EXIT=1 PORT="\$PORT" nohup "\$NODE" "\$DIR/server.js" >>"\$LOG" 2>&1 &
     for _ in \$(seq 50); do health && break; sleep 0.2; done
 fi
-if ! health; then
-    alert "The Offline helper did not start. Details are in ~/Library/Logs/offline-stremio.log. Opening normal Stremio."
-    open -a "\$APP"
-    exit 1
-fi
-
-# 2) Stremio už beží bez nášho rozhrania? "open --args" by sa vtedy ignorovalo → ponúkneme reštart
 running="\$(ps -axww -o pid=,args= | grep -F "\$EXE" | grep -v grep | head -1)"
 if [[ -n "\$running" && "\$running" != *"--webui-url=\$URL"* ]]; then
     answer="\$(osascript -e 'button returned of (display dialog "Stremio is already running without the Offline features. Restart it now?" buttons {"Cancel", "Restart"} default button "Restart" with title "Stremio Offline")' 2>/dev/null || true)"
@@ -95,17 +116,18 @@ if [[ -n "\$running" && "\$running" != *"--webui-url=\$URL"* ]]; then
     osascript -e "tell application id \"\$BUNDLE_ID\" to quit" >/dev/null 2>&1 || true
     for _ in \$(seq 50); do ps -axww -o args= | grep -F "\$EXE" | grep -qv grep || break; sleep 0.2; done
 fi
-
-# 3) Stremio s naším rozhraním (alebo len do popredia, ak už tak beží)
 open -a "\$APP" --args "--webui-url=\$URL"
 EOF
-chmod +x "$LAUNCHER/Contents/MacOS/stremio-offline"
-touch "$LAUNCHER"
+    chmod +x "$LAUNCHER/Contents/MacOS/stremio-offline"
+fi
 
-echo "Installed: $LAUNCHER"
+echo "Installed."
 echo "  Node.js:  $NODE"
 echo "  Stremio:  $APP ($VERSION)"
+echo "  Agent:    $AGENT_PLIST"
+(( WITH_LAUNCHER )) && echo "  Launcher: $LAUNCHER"
 echo
-echo "Start Stremio with \"Stremio Offline\" (Applications → Stremio Offline, or drag it to the Dock)."
+echo "Quit Stremio completely (Cmd+Q) and open it again from the Dock or Applications as usual."
 echo "The first time you will need to log in to Stremio again (the interface runs from a local address)."
-echo "When macOS asks whether node may access a removable volume or the Downloads folder, allow it."
+echo "macOS may show a \"Background item added\" notice and ask whether node may access a removable volume"
+echo "or the Downloads folder — allow it."
