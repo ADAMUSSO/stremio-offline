@@ -20,7 +20,12 @@ a `zenity` (systémové okno na výber priečinka). Bez externých npm balíkov.
   sekcie **Movies** a **Series** (stiahnuté aj z priečinkov na disku spolu). Klik na plagát filmu ho prehrá
   v prehrávači Stremia, aj bez internetu. Epizódy jedného seriálu sú spolu v „priečinku“ s plagátom seriálu;
   po otvorení sa ukážu len série, v ktorých nejaká epizóda je.
-- **Priečinky z disku/HDD** (Offline → Folders): vyber priečinok (skratky Home, Videos, pripojené disky
+- **Kam sa sťahuje** (Offline → Settings → Downloads): predvolene `~/Videos/Stremio`, cez „Change…“ sa dá vybrať
+  iný priečinok, napr. na externom HDD. Keď vybraný disk nie je pripojený (alebo je len na čítanie), nastavenie sa
+  samo vráti na predvolený priečinok a ukáže sa vysvetlenie; po pripojení disku ho vyber znova. Stiahnuté filmy
+  na odpojenom disku sa skryjú a vrátia sa po jeho pripojení. Torrenty počas sťahovania prechádzajú cez vyrovnávaciu
+  pamäť Stremia v počítači (`~/.var/app/com.stremio.Stremio/.stremio-server`, Stremio ju samo obmedzuje).
+- **Priečinky z disku/HDD** (Offline → Settings → Library folders): vyber priečinok (skratky Home, Videos, pripojené disky
   z `/media`, `/mnt`, alebo systémové okno), typ Auto / Movies / Series. Súbory sa rozpoznajú podľa názvu
   (`Názov.2010.1080p…`, `S01E02`, `1x02`, priečinky „Season 2“ / „Séria 2“) a spárujú s Cinemetou
   (plagát, popis, názvy epizód; funguje aj s českými/slovenskými názvami ako Pelíšky, Kolja).
@@ -78,7 +83,7 @@ Ak sa zmení cesta k `node` (napr. iná verzia v nvm), spusti `./install.sh` zno
 | premenná | predvolené |
 |---|---|
 | `PORT` / `HTTPS_PORT` | `11488` / `11489` |
-| `DOWNLOAD_DIR` | `~/Videos/Stremio` |
+| `DOWNLOAD_DIR` | `~/Videos/Stremio` (predvolený; vlastný sa nastavuje v Offline → Settings) |
 | `DATA_DIR` | `~/.local/share/stremio-offline` |
 | `MAX_PARALLEL` | `2` |
 

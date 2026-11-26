@@ -38,6 +38,7 @@
         up: icon(path('M256 416V112m0 0-112 112m112-112 112 112')),
         plus: icon(path('M256 112v288M112 256h288')),
         search: icon(path('M221 80a141 141 0 1 0 0 282 141 141 0 0 0 0-282zm105 246 106 106')),
+        settings: icon(path('M262.3 64h-12.6a24 24 0 0 0-23.6 19.6l-4.8 26.3a147 147 0 0 0-37.9 21.9l-25.2-8.9a24 24 0 0 0-28.6 10.6l-6.3 10.9a24 24 0 0 0 5 30.3l20.4 17.4a148 148 0 0 0 0 43.8l-20.4 17.4a24 24 0 0 0-5 30.3l6.3 10.9a24 24 0 0 0 28.6 10.6l25.2-8.9a147 147 0 0 0 37.9 21.9l4.8 26.3a24 24 0 0 0 23.6 19.6h12.6a24 24 0 0 0 23.6-19.6l4.8-26.3a147 147 0 0 0 37.9-21.9l25.2 8.9a24 24 0 0 0 28.6-10.6l6.3-10.9a24 24 0 0 0-5-30.3l-20.4-17.4a148 148 0 0 0 0-43.8l20.4-17.4a24 24 0 0 0 5-30.3l-6.3-10.9a24 24 0 0 0-28.6-10.6l-25.2 8.9a147 147 0 0 0-37.9-21.9l-4.8-26.3A24 24 0 0 0 262.3 64z'), path('M256 192a64 64 0 1 0 0 128 64 64 0 0 0 0-128z')),
         drive: icon(path('M64 304h384v96a32 32 0 0 1-32 32H96a32 32 0 0 1-32-32zm0 0 48-176a32 32 0 0 1 31-24h226a32 32 0 0 1 31 24l48 176'), path('M368 368h.01', ';stroke-width:44')),
     }
 
@@ -383,7 +384,7 @@
     }
 
     const viewParam = () => new URLSearchParams(location.hash.split('?')[1] || '').get('view')
-    const allDone = () => items.filter(i => i.status === 'done').concat(lib.items)
+    const allDone = () => items.filter(i => i.status === 'done' && i.available !== false).concat(lib.items)
     const findItem = id => items.find(i => i.id === id) || lib.items.find(i => i.id === id)
     const byTitle = (a, b) => String(a.title || '').localeCompare(String(b.title || ''), undefined, { sensitivity: 'base', numeric: true })
 
@@ -404,13 +405,15 @@
         const missing = lib.folders.filter(f => f.available === false)
 
         let head = `<div class="sdl-head"><h1>Offline</h1><div class="sdl-meta">${esc(meta)}</div>
-            <button class="sdl-pill" data-act="folders" title="Folders with movies and series on this computer">${ICON.folder}Folders</button></div>`
+            <button class="sdl-pill" data-act="folders" title="Where downloads are saved and folders with your movies and series">${ICON.settings}Settings</button></div>`
         if (!info.addonSeen) {
             head += `<div class="sdl-banner"><p>Install the <b>Offline Downloads</b> add-on to see these titles on the Board and in the stream list of each title.</p>
                 <button class="sdl-pill" data-act="addon">${ICON.plug}Install add-on</button></div>`
         }
         if (missing.length) head += `<div class="sdl-note">Not connected: ${missing.map(f => esc(f.path)).join(', ')}. Its videos come back when the disk is connected.</div>`
-        if (!done.length && !active.length) {
+        const offDisk = items.filter(i => i.status === 'done' && i.available === false).length
+        if (offDisk) head += `<div class="sdl-note">${plural(offDisk, 'downloaded video is', 'downloaded videos are')} on a disk that is not connected. ${offDisk === 1 ? 'It comes' : 'They come'} back when you connect it.</div>`
+        if (!done.length && !active.length && !offDisk) {
             head += `<div class="sdl-empty">${ICON.offline}<br>Nothing here yet.<br>Press ⬇ next to a stream to download it, or add a folder with movies or series from your disk.<br><br>
                 <button class="sdl-pill sdl-primary" data-act="folders">${ICON.folder}Add a folder</button></div>`
         }
@@ -551,13 +554,27 @@
     const KIND_LABEL = { auto: 'Movies & series', movies: 'Movies', series: 'Series' }
 
     function renderFolders() {
+        const custom = info.downloadDirCustom
+        const choosing = browse?.mode === 'downloads'
         const head = `<div class="sdl-head"><button class="sdl-icon sdl-back" data-act="overview" title="Back to Offline">${ICON.back}</button>
-              <h1>Folders</h1><div class="sdl-meta">${lib.busy ? 'scanning…' : ''}</div>
-              ${lib.folders.length ? `<button class="sdl-pill" data-act="rescan">${ICON.retry}Rescan</button>` : ''}</div>
-            <p class="sdl-hint">Movies and series from these folders show up in Offline and play in Stremio, also without internet.
-              Files are only read — never moved, changed or deleted. Downloads are saved to <b>${esc(info.downloadDir || '')}</b>.</p>`
+              <h1>Settings</h1><div class="sdl-meta"></div></div>
+            <h2>Downloads</h2>
+            <div class="sdl-row sdl-folder-row">
+              <div class="sdl-ficon">${custom && /^\/(media|run\/media|mnt)\//.test(custom) ? ICON.drive : ICON.download}</div>
+              <div class="sdl-title" title="${esc(info.downloadDir || '')}">${esc(info.downloadDir || '')} <span class="sdl-kind">${custom ? 'Your folder' : 'Default'}</span></div>
+              <div class="sdl-actions">
+                ${custom ? `<button class="sdl-pill" data-act="download-default" title="${esc(info.downloadDirDefault || '')}">Use default</button>` : ''}
+                <button class="sdl-pill${choosing ? ' sdl-primary' : ''}" data-act="choose-download-dir">${ICON.folder}Change…</button>
+              </div>
+              <div class="sdl-sub">New movies and series are saved here.${custom ? ' If this disk is not connected, downloads go to the default folder again.' : ''}</div>
+            </div>
+            ${info.downloadDirNote ? `<div class="sdl-note">${esc(info.downloadDirNote)}</div>` : ''}
+            <h2>Library folders</h2>
+            <div class="sdl-head"><p class="sdl-hint" style="flex:1;margin:0">Movies and series from these folders show up in Offline and play in Stremio,
+              also without internet. Files are only read — never moved, changed or deleted.</p>
+              ${lib.folders.length ? `<button class="sdl-pill" data-act="rescan">${ICON.retry}${lib.busy ? 'Scanning…' : 'Rescan'}</button>` : ''}</div>`
         const list = lib.folders.length
-            ? `<h2>Your folders</h2><div class="sdl-rows">` + lib.folders.map(f => {
+            ? `<div class="sdl-rows" style="margin-top:1rem">` + lib.folders.map(f => {
                 const status = f.available === false ? 'Not connected' : f.lastScan ? `${plural(f.movies, 'movie', 'movies')} · ${plural(f.episodes, 'episode', 'episodes')}` : 'Scanning…'
                 const removeBtn = pendingRemove === f.id
                     ? `<button class="sdl-icon" data-act="remove-folder" data-folder="${f.id}" data-confirm title="Files stay on the disk">Remove?</button>`
@@ -572,7 +589,7 @@
             : ''
         setSection('head', head)
         setSection('active', list)
-        setSection('done', `<h2>Add a folder</h2>` + renderBrowser())
+        setSection('done', `<h2 id="sdl-browser-title">${choosing ? 'Choose where to save downloads' : 'Add a library folder'}</h2>` + renderBrowser())
     }
 
     function renderBrowser() {
@@ -594,23 +611,28 @@
             ${browse.error ? `<div class="sdl-note">${esc(browse.error)}</div>` : ''}
             <div class="sdl-dirs">${dirs || '<p class="sdl-hint" style="padding:0 .8rem">No subfolders here.</p>'}</div>
             <div class="sdl-browser-foot">
-              <span class="sdl-hint" style="margin:0">${browse.videos ? plural(browse.videos, 'video', 'videos') + ' directly in this folder' : 'Videos in subfolders are found too'}</span>
+              <span class="sdl-hint" style="margin:0">${browse.mode === 'downloads' ? 'Each movie or series gets its own folder here'
+                  : browse.videos ? plural(browse.videos, 'video', 'videos') + ' directly in this folder' : 'Videos in subfolders are found too'}</span>
               <span class="sdl-grow"></span>
+              ${browse.mode === 'downloads' ? `
+              <button class="sdl-pill" data-act="cancel-download-dir">Cancel</button>
+              <button class="sdl-pill sdl-primary" data-act="set-download-dir">${ICON.download}Save downloads here</button>` : `
               <div class="sdl-seg" role="group" aria-label="What is in this folder">
                 ${['auto', 'movies', 'series'].map(k => `<button data-act="kind" data-kind="${k}" aria-pressed="${kind === k}">${esc({ auto: 'Auto', movies: 'Movies', series: 'Series' }[k])}</button>`).join('')}
               </div>
-              <button class="sdl-pill sdl-primary" data-act="add-folder">${ICON.plus}Add this folder</button>
+              <button class="sdl-pill sdl-primary" data-act="add-folder">${ICON.plus}Add this folder</button>`}
             </div>
           </div>`
     }
 
     async function loadBrowse(dir) {
         const kind = browse?.kind || 'auto'
+        const mode = browse?.mode || 'library'
         try {
             const data = await api('/fs' + (dir ? '?path=' + encodeURIComponent(dir) : ''))
-            browse = { ...data, kind }
+            browse = { ...data, kind, mode }
         } catch (err) {
-            browse = { ...(browse || {}), kind, error: err.message }
+            browse = { ...(browse || {}), kind, mode, error: err.message }
         }
         renderPage()
     }
@@ -658,6 +680,25 @@
                 const { path } = await api('/fs/pick', { method: 'POST', body: JSON.stringify({ start: browse?.path || null }) })
                 if (path) return loadBrowse(path)
                 return
+            } else if (act === 'choose-download-dir') {
+                // prehliadač sa prepne na výber priečinka na sťahovanie, začne pri pripojených diskoch
+                browse = { ...(browse || {}), mode: 'downloads' }
+                const drive = (browse.roots || []).find(r => r.kind === 'drive')
+                await loadBrowse(info.downloadDirCustom || drive?.path || browse.path || null)
+                page.querySelector('#sdl-browser-title')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                return
+            } else if (act === 'cancel-download-dir') {
+                browse = { ...(browse || {}), mode: 'library' }
+                return renderPage()
+            } else if (act === 'set-download-dir' && browse?.path) {
+                info = { ...info, ...(await api('/settings/download-dir', { method: 'POST', body: JSON.stringify({ path: browse.path }) })) }
+                browse = { ...browse, mode: 'library' }
+                toast(`New downloads will be saved to ${info.downloadDir}`)
+                return renderPage()
+            } else if (act === 'download-default') {
+                info = { ...info, ...(await api('/settings/download-dir', { method: 'POST', body: JSON.stringify({ path: null }) })) }
+                toast(`Downloads go to the default folder again: ${info.downloadDir}`)
+                return renderPage()
             } else if (act === 'add-folder' && browse?.path) {
                 await api('/library/folders', { method: 'POST', body: JSON.stringify({ path: browse.path, kind: browse.kind || 'auto' }) })
                 toast(`Added ${browse.path} — looking for movies and series…`)
@@ -698,8 +739,12 @@
     let lib = { version: 0, busy: false, folders: [], items: [] }
     async function refresh() {
         try {
-            const [downloadsList, library] = await Promise.all([api('/downloads'), api('/library?since=' + lib.version)])
+            const settingsOpen = pageOpen && viewParam() === 'folders'
+            const [downloadsList, library, freshInfo] = await Promise.all([
+                api('/downloads'), api('/library?since=' + lib.version), settingsOpen ? api('/info') : null,
+            ])
             items = downloadsList
+            if (freshInfo) info = freshInfo
             if (!library.unchanged) lib = { version: library.version, busy: library.busy, folders: library.folders, items: library.items }
             refreshedOnce = true
         } catch {

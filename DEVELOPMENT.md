@@ -41,12 +41,13 @@ takže prihlásenie, knižnica a addony ostanú. Shell vkladá svoj IPC skript (
 | `lib/fsbrowse.js` | zoznam priečinkov a systémový výber (zenity) |
 | `lib/files.js` | servovanie súborov s Range |
 | `lib/store.js` | JSON úložisko s atomickým zápisom |
+| `lib/settings.js` | nastavenie priečinka na sťahovanie (`settings.json`), návrat na predvolený pri odpojenom disku |
 | `lib/tls.js` | self-signed certifikát (openssl) |
 | `public/inject.js` | celé UI v Stremiu (vanilla JS + CSS v jednom súbore) |
 | `install.sh` / `uninstall.sh` | systemd socket + služba, D-Bus override |
 | `dev/` | nástroje na vývoj (nižšie) |
 
-Dáta: `~/.local/share/stremio-offline/` — `downloads.json`, `library.json`, `meta/`, `img/`, `web-cache/`, `tls/`, `addon-seen`.
+Dáta: `~/.local/share/stremio-offline/` — `downloads.json`, `library.json`, `settings.json`, `meta/`, `img/`, `web-cache/`, `tls/`, `addon-seen`.
 
 ## Ako sa robí vývoj
 
@@ -110,6 +111,15 @@ STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x
   trailer má len `{enc}`. Pole `sources` z addonu je v serializovanom streame ako `announce`.
 - **Meta pre id** Stremio pýta od všetkých addonov a zobrazí prvé hotové v poradí addonov (Cinemeta býva prvá).
 - Streaming server vie aj `GET /{hash}/{idx}?external=1&download=1` (súbor ako príloha) a torrent si vytvorí sám.
+
+## Priečinok na sťahovanie
+
+- `settings.downloadDir()` sa volá pri štarte sťahovania, pri `/info` (stránka Settings sa obnovuje každých 1,5 s)
+  a pri štarte servera. Ak vlastný priečinok neexistuje alebo nie je zapisovateľný, nastavenie sa zmaže
+  (= predvolený) a uloží sa vysvetlenie — používateľ chcel po pripojení HDD vyberať priečinok ručne.
+- Rozpracované sťahovanie má cestu pevne v `item.file`; pri odpojenom disku skončí chybou a po pripojení sa dá obnoviť.
+- Stiahnuté položky na odpojenom disku majú `available: false` (stav sa nemení na chybu); addon ich nevracia.
+- Knižnica priečinkov preskočí súbory spravované sťahovaním (`library.setExclude`), aby sa neukázali dvakrát.
 
 ## Nápady na ďalšiu prácu
 

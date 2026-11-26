@@ -17,6 +17,9 @@ import * as addon from './lib/addon.js'
 import * as metas from './lib/metas.js'
 import * as library from './lib/library.js'
 import * as fsbrowse from './lib/fsbrowse.js'
+import * as settings from './lib/settings.js'
+
+library.setExclude(p => downloads.isDownloadFile(p))
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'public')
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`, `127.0.0.1:${HTTPS_PORT}`, `localhost:${HTTPS_PORT}`])
@@ -63,7 +66,16 @@ async function handleApi(req, res, pathname) {
     if (!apiAllowed(req)) return reply(403, { error: 'Forbidden' })
     const m = pathname.match(/^\/__dl\/api\/downloads(?:\/([0-9a-f]+))?(?:\/(pause|resume))?$/)
     if (pathname === '/__dl/api/info' && req.method === 'GET') {
-        return reply(200, { manifestUrl: addon.MANIFEST_URL, addonSeen: addon.isSeen(), downloadDir: DOWNLOAD_DIR, streamingServer: STREAMING_SERVER })
+        return reply(200, { manifestUrl: addon.MANIFEST_URL, addonSeen: addon.isSeen(), streamingServer: STREAMING_SERVER, ...settings.downloadInfo() })
+    }
+    // kam sa sťahuje: { path } = vlastný priečinok (napr. HDD), { path: null } = predvolený
+    if (pathname === '/__dl/api/settings/download-dir' && req.method === 'POST') {
+        const { path: dir } = await readJson(req)
+        try {
+            return reply(200, settings.setDownloadDir(dir))
+        } catch (e) {
+            return reply(e.status || 500, { error: e.message })
+        }
     }
     if (pathname === '/__dl/api/download' && req.method === 'POST') {
         const { href } = await readJson(req)
@@ -218,13 +230,14 @@ httpsServer.listen(activated ? { fd: 4 } : { port: HTTPS_PORT, host: HOST }, () 
     console.log(`  Stremio --url: ${APP_URL}`)
     console.log(`  web UI from:   ${WEB_UPSTREAM}`)
     console.log(`  add-on:        ${addon.MANIFEST_URL}`)
-    console.log(`  downloads:     ${DOWNLOAD_DIR}`)
+    console.log(`  downloads:     ${settings.downloadDir()}${settings.downloadDir() === DOWNLOAD_DIR ? ' (default)' : ''}`)
     console.log(`  data:          ${DATA_DIR}`)
 })
 
 function exitCleanly() {
     downloads.shutdown()
     library.shutdown()
+    settings.shutdown()
     httpServer.close()
     httpsServer.close()
     process.exit(0)
