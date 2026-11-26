@@ -85,7 +85,7 @@ Ak sa zmení cesta k `node` (napr. iná verzia v nvm), spusti `./install.sh` zno
 Pre samotné Stremio: `STREMIO_ENV` pri inštalácii pridá premenné prostredia do spúšťania Stremia (predvolene žiadne).
 Blikanie pri hoveri/scrollovaní je chyba samotného Stremia pre Linux (WebKitGTK, stremio-linux-shell #61, #67).
 `WEBKIT_DISABLE_DMABUF_RENDERER=1` ho na notebooku Intel + NVIDIA neodstránilo, ale spôsobilo extrémne sekanie
-a miznúce časti UI — nepoužívať. Skúša sa `STREMIO_ENV="GDK_DISABLE=offload" ./install.sh`.
+a miznúce časti UI — nepoužívať. Nepomohol ani `GDK_DISABLE=offload`.
 
 ## Poznámky
 
