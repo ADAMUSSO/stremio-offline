@@ -95,7 +95,11 @@ STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x
 - **Blikanie celej appky pri hoveri/scrollovaní** je chyba samotného Stremia pre Linux (WebKitGTK,
   stremio-linux-shell #61, #67), nie tohto projektu. `install.sh` vie pridať premenné cez `STREMIO_ENV`
   (predvolene žiadne). Vyskúšané na Intel Iris Xe + RTX 3050: `WEBKIT_DISABLE_DMABUF_RENDERER=1` → extrémne sekanie
-  a čierne/miznúce časti UI, preto sa nepoužíva. Wrapper `/app/bin/stremio` pri `/dev/nvidia0` sám nastaví
+  a čierne/miznúce časti UI, preto sa nepoužíva.
+  Analýza screencastu (snímka po snímke): pri hoveri sa v oblasti plagátu na jednu snímku vráti starší obsah
+  (zelená ikona → sivá → zelená), t. j. displej ukáže zastaraný buffer len v časti okna. Kandidát:
+  `STREMIO_ENV="GDK_DISABLE=offload" ./install.sh` (GTK neposiela obraz WebKitu cez samostatnú subsurface,
+  zloží ho sám; hardvérové vykresľovanie ostáva). Stav: nastavené, čaká na overenie v appke. Wrapper `/app/bin/stremio` pri `/dev/nvidia0` sám nastaví
   `GSK_RENDERER=opengl`, takže túto premennú cez `--env` prepísať nejde (len obídením wrappera).
 - **Tlačidlo play** kopíruje štandard Stremia z plagátov: 56 px kruh, `rgba(12,11,17,.4)`, vnútorný okraj
   2.1 px `rgba(255,255,255,.9)`, ikona 32 px zo stremio-icons (optické posunutie je v tvare, nie v `margin`).
