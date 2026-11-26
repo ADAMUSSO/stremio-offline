@@ -567,7 +567,7 @@
               <h1>Settings</h1><div class="sdl-meta"></div></div>
             <h2>Downloads</h2>
             <div class="sdl-row sdl-folder-row">
-              <div class="sdl-ficon">${custom && /^\/(media|run\/media|mnt)\//.test(custom) ? ICON.drive : ICON.download}</div>
+              <div class="sdl-ficon">${custom && /^(\/(media|run\/media|mnt|Volumes)\/|[A-Za-z]:[\\\/])/.test(custom) ? ICON.drive : ICON.download}</div>
               <div class="sdl-title" title="${esc(info.downloadDir || '')}">${esc(info.downloadDir || '')} <span class="sdl-kind">${custom ? 'Your folder' : 'Default'}</span></div>
               <div class="sdl-actions">
                 ${custom ? `<button class="sdl-pill" data-act="download-default" title="${esc(info.downloadDirDefault || '')}">Use default</button>` : ''}
@@ -587,7 +587,7 @@
                     ? `<button class="sdl-icon" data-act="remove-folder" data-folder="${f.id}" data-confirm title="Files stay on the disk">Remove?</button>`
                     : `<button class="sdl-icon" data-act="remove-folder" data-folder="${f.id}" title="Remove from Stremio (files stay on the disk)">${ICON.trash}</button>`
                 return `<div class="sdl-row sdl-folder-row">
-                    <div class="sdl-ficon">${/^\/(media|run\/media|mnt)\//.test(f.path) ? ICON.drive : ICON.folder}</div>
+                    <div class="sdl-ficon">${/^(\/(media|run\/media|mnt|Volumes)\/|[A-Za-z]:[\\\/])/.test(f.path) ? ICON.drive : ICON.folder}</div>
                     <div class="sdl-title" title="${esc(f.path)}">${esc(f.path.split('/').pop() || f.path)} <span class="sdl-kind">${esc(KIND_LABEL[f.kind] || '')}</span></div>
                     <div class="sdl-actions">${removeBtn}</div>
                     <div class="sdl-sub">${esc(f.path)} · ${esc(status)}</div>

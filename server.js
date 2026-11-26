@@ -2,12 +2,13 @@
 //  1. proxy web UI s vloženým tlačidlom "⬇ stiahnuť" pri každom streame
 //  2. správca sťahovania (torrent cez Stremio streaming server, HTTP, HLS)
 //  3. Stremio addon so stiahnutými titulmi na offline prehrávanie
+import './lib/node-check.js'
 import http from 'node:http'
 import https from 'node:https'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { HOST, PORT, BASE_URL, HTTPS_PORT, HTTPS_URL, STREMIO_ORIGIN, APP_URL, DOWNLOAD_DIR, DATA_DIR, WEB_UPSTREAM, STREAMING_SERVER } from './lib/config.js'
+import { HOST, PORT, BASE_URL, HTTPS_PORT, HTTPS_URL, ENABLE_HTTPS, PLATFORM, STREMIO_ORIGIN, APP_URL, DOWNLOAD_DIR, DATA_DIR, WEB_UPSTREAM, STREAMING_SERVER } from './lib/config.js'
 import { ensureCert } from './lib/tls.js'
 import { parsePlayerHref } from './lib/playerLink.js'
 import { handleProxy } from './lib/proxy.js'
@@ -222,26 +223,32 @@ async function handler(req, res) {
 }
 
 // systemd socket aktivácia: fd 3 = HTTP, fd 4 = HTTPS (poradie podľa ListenStream v .socket)
-const activated = Number(process.env.LISTEN_FDS || 0) >= 2 && Number(process.env.LISTEN_PID || process.pid) === process.pid
+const activated = Number(process.env.LISTEN_FDS || 0) >= (ENABLE_HTTPS ? 2 : 1) && Number(process.env.LISTEN_PID || process.pid) === process.pid
 const httpServer = http.createServer(handler)
-const httpsServer = https.createServer(ensureCert(), handler)
+// HTTPS iba na Linuxe (proxy streaming servera); macOS/Windows načítajú UI z HTTP portu
+const httpsServer = ENABLE_HTTPS ? https.createServer(ensureCert(), handler) : null
 fs.mkdirSync(DOWNLOAD_DIR, { recursive: true })
-httpServer.listen(activated ? { fd: 3 } : { port: PORT, host: HOST })
-httpsServer.listen(activated ? { fd: 4 } : { port: HTTPS_PORT, host: HOST }, () => {
-    console.log(`Stremio Offline running${activated ? ' (socket activated)' : ''}`)
-    console.log(`  Stremio --url: ${APP_URL}`)
+const ready = () => {
+    console.log(`Stremio Offline running on ${PLATFORM}${activated ? ' (socket activated)' : ''}`)
+    console.log(`  Stremio UI:    ${APP_URL}`)
     console.log(`  web UI from:   ${WEB_UPSTREAM}`)
     console.log(`  add-on:        ${addon.MANIFEST_URL}`)
     console.log(`  downloads:     ${settings.downloadDir()}${settings.downloadDir() === DOWNLOAD_DIR ? ' (default)' : ''}`)
     console.log(`  data:          ${DATA_DIR}`)
-})
+}
+if (httpsServer) {
+    httpServer.listen(activated ? { fd: 3 } : { port: PORT, host: HOST })
+    httpsServer.listen(activated ? { fd: 4 } : { port: HTTPS_PORT, host: HOST }, ready)
+} else {
+    httpServer.listen(activated ? { fd: 3 } : { port: PORT, host: HOST }, ready)
+}
 
 function exitCleanly() {
     downloads.shutdown()
     library.shutdown()
     settings.shutdown()
     httpServer.close()
-    httpsServer.close()
+    httpsServer?.close()
     process.exit(0)
 }
 
@@ -265,4 +272,5 @@ async function checkIdle() {
         exitCleanly()
     }
 }
-if (activated && IDLE_EXIT_MS > 0) setInterval(checkIdle, Math.min(15000, IDLE_EXIT_MS / 2))
+// Linux: systemd socket aktivácia; macOS/Windows: pomocníka spúšťa spúšťač Stremia s IDLE_EXIT=1
+if ((activated || process.env.IDLE_EXIT === '1') && IDLE_EXIT_MS > 0) setInterval(checkIdle, Math.min(15000, IDLE_EXIT_MS / 2))

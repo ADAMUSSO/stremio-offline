@@ -42,9 +42,11 @@ takže prihlásenie, knižnica a addony ostanú. Shell vkladá svoj IPC skript (
 | `lib/files.js` | servovanie súborov s Range |
 | `lib/store.js` | JSON úložisko s atomickým zápisom |
 | `lib/settings.js` | nastavenie priečinka na sťahovanie (`settings.json`), návrat na predvolený pri odpojenom disku |
-| `lib/tls.js` | self-signed certifikát (openssl) |
+| `lib/tls.js` | self-signed certifikát (openssl), iba Linux |
+| `lib/node-check.js` | kontrola Node 20+ (prvý import v `server.js`) |
 | `public/inject.js` | celé UI v Stremiu (vanilla JS + CSS v jednom súbore) |
-| `install.sh` / `uninstall.sh` | systemd socket + služba, D-Bus override |
+| `install.sh` / `uninstall.sh` | Linux: systemd socket + služba, D-Bus override |
+| `install-macos.sh` / `uninstall-macos.sh` | macOS: spúšťač `Stremio Offline.app` |
 | `dev/` | nástroje na vývoj (nižšie) |
 
 Dáta: `~/.local/share/stremio-offline/` — `downloads.json`, `library.json`, `settings.json`, `meta/`, `img/`, `web-cache/`, `tls/`, `addon-seen`.
@@ -141,7 +143,30 @@ STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x
 - Cinemeta nenájde všetko (napr. slovenský seriál „Profesionáli“, skratky ako „AOT“) — také tituly ostanú lokálne
   (`local:` id) a hrajú sa s názvom zo súboru.
 
+## macOS a Windows
+
+Zistené z aplikácií (macOS: rozbalené `Stremio_x64.dmg` 5.1.26, iba čítanie textov z binárky; Windows: zdrojový
+kód stremio-shell-ng):
+
+- Obe aplikácie sú v Ruste s mpv a majú prepínač **`--webui-url`** (macOS aj env `WEBUI_URL`), ďalej `--server-url`,
+  `--start-hidden`, `--hide-splash`… macOS používa WKWebView a IPC `window.webkit.messageHandlers.ipc`, Windows WebView2.
+  Windows dôveruje IPC správam z originu `--webui-url` (overené v kóde `same_origin`), macOS pravdepodobne rovnako.
+- Predvolené UI je `https://web.stremio.com/#/?streamingServerUrl=…` → origin `web.stremio.com`, takže prihlásenie
+  sa pri vlastnom UI zachovať nedá (raz sa treba prihlásiť znova). Preto na macOS/Windows nepoužívame proxy
+  streaming servera ani HTTPS (`ENABLE_HTTPS=0`) a UI ide priamo z `http://127.0.0.1:11488/`.
+- macOS má v `Stremio.app/Contents/MacOS/` vlastný `node` (v16.20.2) a `server.js`; Node 16 nestačí (chýba `fetch`,
+  `AbortSignal.any`…), preto `lib/node-check.js` vyžaduje Node 20+.
+- macOS nemá D-Bus aktiváciu → `install-macos.sh` vytvorí spúšťač `~/Applications/Stremio Offline.app`
+  (skript): spustí pomocníka s `IDLE_EXIT=1` a potom `open -a Stremio --args --webui-url=…`. Keď Stremio už beží
+  bez tohto prepínača, `--args` by sa ignorovalo → spúšťač ponúkne reštart.
+- `lib/config.js` / `lib/fsbrowse.js` / `lib/downloads.js` majú vetvy pre `darwin` a `win32` (cesty, `/Volumes`,
+  písmená diskov, výber priečinka cez `osascript` / PowerShell). Windows inštalátor zatiaľ chýba.
+- Netestované na skutočnom Macu ani Windowse. Na Linuxe sa dá „Mac režim“ vyskúšať:
+  `ENABLE_HTTPS=0 IDLE_EXIT=1 PORT=11590 DATA_DIR=/tmp/x node server.js` a otvoriť `http://127.0.0.1:11590/`.
+
 ## Nápady na ďalšiu prácu
+
+- Windows: inštalátor (PowerShell) — zástupca „Stremio Offline“ so `--webui-url`, pomocník s `IDLE_EXIT=1`.
 
 - Ručné priradenie titulu pre nespárované položky (vyhľadať v Stremiu alebo vložiť IMDb id).
 

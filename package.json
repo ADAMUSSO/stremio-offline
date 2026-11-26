@@ -1,7 +1,7 @@
 {
   "name": "offline-stremio",
   "version": "0.3.0",
-  "description": "Download streams and play movies or series from your own folders offline, directly in the Stremio 5 Linux app",
+  "description": "Download streams and play movies or series from your own folders offline, directly in the Stremio 5 desktop app (Linux, macOS)",
   "type": "module",
   "main": "server.js",
   "scripts": {
@@ -14,5 +14,10 @@
     "node": ">=20"
   },
   "license": "MIT",
-  "author": "Adam Svitek"
+  "author": "Adam Svitek",
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ]
 }

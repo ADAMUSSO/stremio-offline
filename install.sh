@@ -6,6 +6,8 @@
 # Všetko je na úrovni používateľa a dá sa vrátiť cez ./uninstall.sh
 set -euo pipefail
 
+[[ "$(uname)" == "Linux" ]] || { echo "This script is for Linux. On macOS use ./install-macos.sh" >&2; exit 1; }
+
 DIR="$(cd "$(dirname "$0")" && pwd)"
 NODE="$(readlink -f "$(command -v node || true)" 2>/dev/null || true)"
 PORT="${PORT:-11488}"
