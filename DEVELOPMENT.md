@@ -121,7 +121,19 @@ STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x
 - Stiahnuté položky na odpojenom disku majú `available: false` (stav sa nemení na chybu); addon ich nevracia.
 - Knižnica priečinkov preskočí súbory spravované sťahovaním (`library.setExclude`), aby sa neukázali dvakrát.
 
+## Knižnica priečinkov
+
+- Pripojenie/odpojenie disku: `checkMounts()` každých 5 s porovná podpis priečinkov (`dev:ino` alebo `missing`);
+  pri zmene spustí `scanAll()`. Počas prehľadávania sa zmena zaradí (`rescanPending`).
+- Prázdny priečinok na inom zariadení ako pri poslednom prehľadaní = prázdny bod pripojenia → `available: false`,
+  súbory sa nezahodia.
+- `effectiveKind()`: typ Auto podľa názvu priečinka; `parseAll()`: súrodenci s číslom na konci → epizódy.
+- Cinemeta nenájde všetko (napr. slovenský seriál „Profesionáli“, skratky ako „AOT“) — také tituly ostanú lokálne
+  (`local:` id) a hrajú sa s názvom zo súboru.
+
 ## Nápady na ďalšiu prácu
+
+- Ručné priradenie titulu pre nespárované položky (vyhľadať v Stremiu alebo vložiť IMDb id).
 
 - **Verzia pre Windows/macOS bez zásahu do Stremia:** rovnaký server ako lokálny addon + malá aplikácia v lište
   (ako streaming server Stremia). Fungovalo by: vlastné priečinky/HDD, sťahovanie (položky „⬇ Save offline“

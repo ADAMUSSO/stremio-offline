@@ -30,8 +30,10 @@ a `zenity` (systémové okno na výber priečinka). Bez externých npm balíkov.
   (`Názov.2010.1080p…`, `S01E02`, `1x02`, priečinky „Season 2“ / „Séria 2“) a spárujú s Cinemetou
   (plagát, popis, názvy epizód; funguje aj s českými/slovenskými názvami ako Pelíšky, Kolja).
   Titulky vedľa videa (`Film.sk.srt`) sa ponúknu v prehrávači. Súbory sa iba čítajú — nič sa nepresúva ani nemaže.
-  Odpojený disk sa ukáže ako „Not connected“ a jeho filmy sa vrátia po pripojení; priečinky sa prehľadávajú
-  pri štarte a každých 30 minút (alebo tlačidlom Rescan).
+  Odpojený disk sa ukáže ako „Not connected“ a jeho filmy sa vrátia po pripojení — pripojenie aj odpojenie disku
+  sa zistí do 5 sekúnd a knižnica sa sama prehľadá. Inak sa prehľadáva pri štarte, každých 30 minút a tlačidlom Rescan.
+  Typ Auto sa spresní podľa názvu priečinka (SERIES/Seriály/Shows → seriály, MOVIES/Filmy → filmy); súbory v jednom
+  priečinku, ktoré sa líšia len číslom na konci (`chernobyl 1`, `chernobyl 2`), sú epizódy.
 - **Addon „Offline Downloads“** (voliteľný, inštalácia jedným klikom zo stránky Offline): riadok „Offline“ na Boarde
   a stream `💾 Offline` v zozname streamov pri titule.
 - **Štart bez internetu**: web UI Stremia sa ukladá na disk, takže appka sa načíta aj offline.
