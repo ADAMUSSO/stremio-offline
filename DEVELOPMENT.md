@@ -86,8 +86,12 @@ STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x
   Zvýraznenie potláčame CSS-kom cez triedu na `<html>` (`sdl-offline-open`).
 - **Stránka Offline je na trase `#/?offline=1`** (Board s parametrom), lebo pri neznámej trase Stremio zobrazí
   „Page not found“ bez menu. `#/downloads` patrí natívnemu downloaderu Stremia (iba pre platené Supporter účty — nemeniť).
-- **Board so Spotlight bannerom** presvitá cez priehľadné menu → `nav-content-container` Boardu skrývame cez `opacity`
-  (`visibility` si potomkovia vedia prepísať).
+- **Board so Spotlight bannerom** presvitá cez priehľadné menu → `nav-content-container` Boardu pri otvorenej stránke
+  Offline vypíname cez `display:none` (`visibility` si potomkovia prepíšu a pri `opacity` karusel pod stránkou
+  ďalej animuje a WebKit prekresľuje).
+- **WebKitGTK blikanie pri hoveri:** prechodové animácie `opacity`/`outline` na hover vytvoria a zrušia grafickú
+  vrstvu → dve bliknutia. Hover efekty sú preto okamžité (bez `transition`), rámik plagátu cez `box-shadow`.
+  Zabudovaný prehliadač na testovanie je Chromium, takže toto sa dá overiť iba v samotnej appke.
 - **Úzke okno (< 640 px):** bočné menu sa stane lištou dole → `placePage()` počíta polohu z oboch líšt.
 - **Globálne `overflow: hidden`** v CSS Stremia — vlastné kontajnery, ktoré majú presahovať, treba povoliť.
 - **`requestAnimationFrame` v skrytom okne nebeží** → MutationObserver plánuje cez `setTimeout`.

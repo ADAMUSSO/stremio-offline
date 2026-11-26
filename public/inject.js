@@ -45,7 +45,7 @@
     style.textContent = `
     .sdl-btn{position:absolute;top:50%;right:4.25rem;transform:translateY(-50%);z-index:3;width:2.6rem;height:2.6rem;
       border-radius:50%;border:0;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;
-      color:#fff;background:rgba(255,255,255,.08);opacity:.85;transition:background .15s,opacity .15s;font:700 .7rem/1 PlusJakartaSans,sans-serif}
+      color:#fff;background:rgba(255,255,255,.08);opacity:.85;font:700 .7rem/1 PlusJakartaSans,sans-serif}
     .sdl-btn:hover{opacity:1;background:#7b5bf5}
     .sdl-btn svg{width:1.3rem;height:1.3rem}
     .sdl-btn[data-state=downloading],.sdl-btn[data-state=queued]{opacity:1;
@@ -59,7 +59,8 @@
     html.sdl-offline-open nav[class*="vertical-nav-bar"] a.selected:not(.sdl-nav) svg{color:var(--foreground-color-primary,#fff);opacity:.35}
     html.sdl-offline-open nav[class*="vertical-nav-bar"] a.selected:not(.sdl-nav) [class*="label"]{color:var(--foreground-color-primary,#fff)}
     /* obsah Boardu (Spotlight banner, riadky) inak presvitá cez priehľadné menu Stremia */
-    html.sdl-offline-open [class*="board-content-container"] > [class*="nav-content-container"]{opacity:0!important;pointer-events:none!important}
+    /* obsah Boardu úplne vypneme: Spotlight karusel by pod stránkou animoval ďalej (prekresľovanie/blikanie vo WebKite) */
+    html.sdl-offline-open [class*="board-content-container"] > [class*="nav-content-container"]{display:none!important}
     @media (max-width:640px){
       html.sdl-offline-open nav[class*="vertical-nav-bar"] a.selected:not(.sdl-nav) [class*="label"]{opacity:.6}
     }
@@ -67,7 +68,7 @@
       border-radius:.6rem;background:#7b5bf5;color:#fff;font:700 .7rem/1.15rem PlusJakartaSans,sans-serif;text-align:center}
     .sdl-nav .sdl-count:empty{display:none}
 
-    .sdl-page{--px:2rem;--py:1.5rem;position:fixed;z-index:50;overflow:auto;box-sizing:border-box;padding:var(--py) var(--px) 3rem;
+    .sdl-page{--px:2rem;--py:1.5rem;position:fixed;z-index:50;overflow:auto;box-sizing:border-box;padding:var(--py) var(--px) 3rem;will-change:transform;
       background:linear-gradient(41deg,#0c0b11 0%,#1a173e 100%);color:rgba(255,255,255,.9);font-family:PlusJakartaSans,Arial,sans-serif}
     .sdl-page[hidden]{display:none}
     .sdl-page h1{margin:0;font-size:1.6rem;font-weight:700}
@@ -101,16 +102,16 @@
     .sdl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(10rem,1fr));gap:1.5rem 1.25rem}
     .sdl-card{position:relative;cursor:pointer}
     .sdl-poster{position:relative;aspect-ratio:2/3;border-radius:.75rem;overflow:hidden;background:rgba(255,255,255,.06);
-      outline:2px solid transparent;outline-offset:2px;transition:outline-color .15s}
-    .sdl-card:hover .sdl-poster{outline-color:rgba(255,255,255,.9)}
+    }
+    .sdl-card:hover .sdl-poster{box-shadow:0 0 0 2px rgba(255,255,255,.9)}
     .sdl-poster img{width:100%;height:100%;object-fit:cover;display:block}
     .sdl-poster .sdl-noimg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:1rem;text-align:center;font-weight:600}
-    .sdl-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(12,11,17,.45);opacity:0;transition:opacity .15s}
+    .sdl-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(12,11,17,.45);opacity:0}
     .sdl-card:hover .sdl-play{opacity:1}
     .sdl-play span{width:3.5rem;height:3.5rem;border-radius:50%;background:#7b5bf5;color:#fff;display:flex;align-items:center;justify-content:center}
     .sdl-play svg{width:1.4rem;height:1.4rem;margin-left:.2rem}
     .sdl-tag{position:absolute;left:.5rem;top:.5rem;padding:.25rem .5rem;border-radius:.4rem;background:rgba(12,11,17,.8);font-size:.75rem;font-weight:700}
-    .sdl-card-actions{position:absolute;right:.4rem;top:.4rem;display:flex;gap:.25rem;opacity:0;transition:opacity .15s}
+    .sdl-card-actions{position:absolute;right:.4rem;top:.4rem;display:flex;gap:.25rem;opacity:0}
     .sdl-card:hover .sdl-card-actions{opacity:1}
     .sdl-card-actions .sdl-icon{background:rgba(12,11,17,.8)}
     .sdl-card .sdl-title{margin-top:.6rem;font-weight:600;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -118,14 +119,12 @@
 
     /* priečinok seriálu: za plagátom dve "karty" ako kôpka */
     .sdl-stack{position:relative} /* kôpka presahuje do medzery mriežky, karty ostanú rovnako veľké */
-    .sdl-stack::before,.sdl-stack::after{content:"";position:absolute;inset:0;border-radius:.75rem;background:#3a3660;transition:transform .15s}
+    .sdl-stack::before,.sdl-stack::after{content:"";position:absolute;inset:0;border-radius:.75rem;background:#3a3660}
     .sdl-stack::before{transform:translate(.7rem,-.7rem);opacity:.45}
     .sdl-stack::after{transform:translate(.35rem,-.35rem);opacity:.8}
     .sdl-stack .sdl-poster{z-index:1}
     /* Stremio dáva globálne overflow:hidden — kôpka musí presahovať */
     .sdl-page [data-section],.sdl-page .sdl-grid,.sdl-page .sdl-card,.sdl-page .sdl-stack{overflow:visible}
-    .sdl-card:hover .sdl-stack::before{transform:translate(.85rem,-.85rem)}
-    .sdl-card:hover .sdl-stack::after{transform:translate(.45rem,-.45rem)}
     .sdl-tag svg{width:.9rem;height:.9rem;vertical-align:-.15rem;margin-right:.25rem}
 
     .sdl-hero{position:relative;margin:calc(-1 * var(--py)) calc(-1 * var(--px)) 0;padding:var(--py) var(--px) 1.75rem;display:flex;gap:1.5rem;align-items:flex-end;min-height:12rem;
@@ -187,7 +186,7 @@
 
     .sdl-toast{position:fixed;left:50%;bottom:2rem;transform:translateX(-50%);z-index:2147483001;max-width:min(36rem,90vw);
       padding:.8rem 1.2rem;border-radius:.75rem;background:#2b2940;color:#fff;font:14px/1.4 PlusJakartaSans,sans-serif;
-      box-shadow:0 8px 30px rgba(0,0,0,.5);transition:opacity .3s;cursor:pointer}
+      box-shadow:0 8px 30px rgba(0,0,0,.5);transition:opacity .3s;will-change:opacity;cursor:pointer}
     .sdl-toast[data-type=error]{background:#7d2a24}
     `
     document.documentElement.appendChild(style)
