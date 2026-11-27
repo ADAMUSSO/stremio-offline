@@ -110,9 +110,25 @@ async function handleApi(req, res, pathname) {
         }
     }
     if (pathname === '/__dl/api/season/batches' && req.method === 'GET') return reply(200, season.list())
-    const sb = pathname.match(/^\/__dl\/api\/season\/batches\/([0-9a-f]+)(\/stop)?$/)
-    if (sb && sb[2] && req.method === 'POST') return reply(season.stop(sb[1]) ? 200 : 409, { ok: true })
+    const sb = pathname.match(/^\/__dl\/api\/season\/batches\/([0-9a-f]+)(?:\/(stop|choices|choose))?$/)
+    if (sb && sb[2] === 'stop' && req.method === 'POST') return reply(season.stop(sb[1]) ? 200 : 409, { ok: true })
     if (sb && !sb[2] && req.method === 'DELETE') return reply(season.dismiss(sb[1]) ? 200 : 404, { ok: true })
+    // epizódy, ktoré z vybraného zdroja nie sú: zoznam streamov na výber a výber používateľa
+    if (sb && sb[2] === 'choices' && req.method === 'GET') {
+        try {
+            return reply(200, await season.choices(sb[1]))
+        } catch (e) {
+            return reply(e.status || 500, { error: e.message })
+        }
+    }
+    if (sb && sb[2] === 'choose' && req.method === 'POST') {
+        const { picks } = await readJson(req)
+        try {
+            return reply(200, await season.choose(sb[1], picks))
+        } catch (e) {
+            return reply(e.status || 500, { error: e.message })
+        }
+    }
     if (m && !m[1] && req.method === 'GET') return reply(200, downloads.list().map(addon.decorateItem))
     if (pathname === '/__dl/api/downloads/forget-moved' && req.method === 'POST') return reply(200, { forgotten: await downloads.forgetMoved() })
 
@@ -267,6 +283,7 @@ function exitCleanly() {
     downloads.shutdown()
     library.shutdown()
     settings.shutdown()
+    season.shutdown()
     httpServer.close()
     httpsServer?.close()
     process.exit(0)

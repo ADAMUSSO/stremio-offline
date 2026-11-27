@@ -212,6 +212,34 @@
     .sdl-menu-foot[data-type=error]{color:#ff9d94}
     .sdl-row.sdl-batch{background:rgba(123,91,245,.1)}
     .sdl-batch-note b{font-weight:700}
+    .sdl-pill:disabled{opacity:.45;cursor:default}
+    .sdl-pill.sdl-primary:disabled:hover{background:#7b5bf5}
+    .sdl-pick-filter{margin-top:1rem}
+    .sdl-pick{margin-top:1.75rem}
+    .sdl-pick-head{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+    .sdl-pick-title{flex:1;min-width:12rem;font-size:1.05rem;font-weight:700}
+    .sdl-pick-title span{color:rgba(255,255,255,.55);font-weight:500}
+    .sdl-pick-why{margin:.5rem 0 .25rem;color:rgba(255,255,255,.55);font-size:.85rem}
+    .sdl-streams{display:flex;flex-direction:column;gap:.4rem;margin-top:.75rem}
+    .sdl-stream{display:grid;grid-template-columns:1.1rem 9rem 1fr auto;gap:.25rem 1rem;align-items:start;padding:.75rem 1rem;border:0;border-radius:.75rem;
+      background:rgba(255,255,255,.04);color:#fff;text-align:left;cursor:pointer;font:500 .85rem/1.45 PlusJakartaSans,sans-serif}
+    .sdl-stream:hover{background:rgba(255,255,255,.08)}
+    .sdl-stream[aria-checked=true]{background:rgba(123,91,245,.2);box-shadow:inset 0 0 0 2px #7b5bf5}
+    .sdl-radio{width:1.1rem;height:1.1rem;box-sizing:border-box;border-radius:50%;border:2px solid rgba(255,255,255,.45);margin-top:.1rem}
+    .sdl-stream[aria-checked=true] .sdl-radio{border:5px solid #7b5bf5;background:#fff}
+    .sdl-sname{font-weight:700;overflow-wrap:anywhere}
+    .sdl-sdesc{color:rgba(255,255,255,.65);font-size:.8rem;overflow-wrap:anywhere;min-width:0}
+    .sdl-sbadges{display:flex;flex-direction:column;gap:.3rem;align-items:flex-end}
+    .sdl-tagk{padding:.15rem .5rem;border-radius:.35rem;background:rgba(255,255,255,.08);font-size:.72rem;font-weight:600;color:rgba(255,255,255,.7);white-space:nowrap}
+    .sdl-tagk.sdl-good{background:rgba(47,125,71,.35);color:#a6e4b8}
+    .sdl-more{margin-top:.4rem;border:0;background:transparent;color:#b3a3ff;padding:.4rem 0;cursor:pointer;font:600 .85rem PlusJakartaSans,sans-serif}
+    .sdl-more:hover{color:#fff}
+    .sdl-pick-foot{position:sticky;bottom:0;z-index:2;margin:2rem calc(-1 * var(--px)) 0;padding:1rem var(--px);display:flex;gap:1rem;align-items:center;flex-wrap:wrap;
+      background:rgba(21,19,47,.97);box-shadow:0 -12px 30px rgba(0,0,0,.35)}
+    .sdl-pick-foot span{flex:1;min-width:12rem;color:rgba(255,255,255,.7)}
+    .sdl-page.sdl-narrow .sdl-stream{grid-template-columns:1.1rem 1fr}
+    .sdl-page.sdl-narrow .sdl-stream > :not(.sdl-radio){grid-column:2}
+    .sdl-page.sdl-narrow .sdl-sbadges{flex-direction:row;align-items:flex-start}
     .sdl-batch-note .sdl-icon{color:inherit;opacity:.75}
     .sdl-batch-note .sdl-icon:hover{opacity:1}
     .sdl-banner.sdl-batch-note{margin-top:1rem;padding:.75rem 1rem;font-size:.9rem;color:rgba(255,255,255,.85)}
@@ -244,7 +272,7 @@
     }
 
     let toastTimer
-    function toast(text, type = 'info', onClick = null) {
+    function toast(text, type = 'info', onClick = null, duration = 4500) {
         let el = document.querySelector('.sdl-toast')
         if (!el) {
             el = document.createElement('div')
@@ -257,7 +285,7 @@
         el.style.pointerEvents = 'auto'
         el.onclick = () => { el.style.opacity = '0'; el.style.pointerEvents = 'none'; onClick?.() }
         clearTimeout(toastTimer)
-        toastTimer = setTimeout(() => { el.style.opacity = '0'; el.style.pointerEvents = 'none' }, 4500)
+        toastTimer = setTimeout(() => { el.style.opacity = '0'; el.style.pointerEvents = 'none' }, duration)
     }
 
     // --- tlačidlo ⬇ pri streame ---------------------------------------------------
@@ -381,7 +409,7 @@
         try {
             const b = await api('/season', { method: 'POST', body: JSON.stringify({ href: a.getAttribute('href'), scope }) })
             batches = [b, ...batches.filter(x => x.id !== b.id)]
-            toast(`Downloading ${b.title} · ${b.seasonLabel}${b.from ? ` from ${b.from}` : ''} — ${plural(b.total, 'episode', 'episodes')}. Click to see progress`, 'info', () => { location.hash = PAGE_HASH })
+            toast(`${batchName(b)}: looking for this source in ${plural(b.total, 'episode', 'episodes')}. Click to see progress`, 'info', () => { location.hash = PAGE_HASH })
         } catch (err) {
             toast(err.message, 'error')
         } finally {
@@ -470,7 +498,7 @@
             if (idx > 0 && rest.want && rest.want !== all.want)
                 html += menuButton('rest', ICON.forward, preview.season == null ? `Download from ${code} on` : `Download the rest of ${name}`, `From ${code} · ${rest.text}`, !preview.canSearch)
             html += `<div class="sdl-menu-foot">${preview.canSearch
-                ? 'Every episode comes from this same source. If the add-on doesn’t have it for an episode, a similar one in the same quality is used.'
+                ? 'Every episode comes from this same source. If an episode isn’t available from it, nothing else is used — you choose its stream yourself.'
                 : 'This stream doesn’t come from an add-on, so the other episodes can’t be looked up.'}</div>`
         }
         if (el.__html === html) return
@@ -615,6 +643,8 @@
     function renderPage() {
         if (!pageOpen) return
         if (viewParam() === 'folders') return renderFolders()
+        const pick = pickParam()
+        if (pick) return renderPicker(pick)
         const series = seriesParam()
         if (series) return renderSeries(series)
 
@@ -696,23 +726,116 @@
             <div class="sdl-bar"><i style="width:${pct}%"></i></div></div>`
     }
 
-    // ...a po dokončení poznámka: čo sa pridalo, čo z tohto zdroja nie je (s odkazom na epizódu, kde si vyberie iný stream)
+    // ...a po dokončení poznámka: čo sa pridalo a ktoré epizódy čakajú, kým si pre ne vyberieš stream
     function batchNote(b) {
         const join = list => list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0]
         const added = b.queued.length
+        const waiting = b.pending.length
         const parts = [b.status === 'stopped' ? `Stopped — ${added} of ${plural(b.total, 'episode', 'episodes')} added.`
             : added === b.total ? `All ${plural(b.total, 'episode', 'episodes')} added.` : `${added} of ${plural(b.total, 'episode', 'episodes')} added.`]
-        if (b.notFound.length) parts.push(`${join(b.notFound)} ${b.notFound.length === 1 ? 'isn’t' : 'aren’t'} available from this source.`)
-        if (b.failed.length) parts.push(`The add-on didn’t answer for ${join(b.failed)}.`)
-        if (b.similar.length) parts.push(`${join(b.similar)} ${b.similar.length === 1 ? 'uses' : 'use'} a similar source in the same quality.`)
-        const first = b.missingIds?.[0]
-        const missing = b.notFound.length + b.failed.length
-        const pick = first
-            ? `<button class="sdl-pill" data-act="batch-pick" data-type="${esc(b.type)}" data-meta="${esc(b.metaId)}" data-video="${esc(first)}" title="Opens the episode — choose a different stream there">Choose a stream${missing > 1 ? ` for ${esc([...b.notFound, ...b.failed][0])}` : ''}</button>`
-            : ''
-        return `<div class="${missing ? 'sdl-note' : 'sdl-banner'} sdl-note-row sdl-batch-note">
-            <span><b>${esc(batchName(b))}:</b> ${esc(parts.join(' '))}</span>${pick}
-            <button class="sdl-icon" data-act="batch-dismiss" data-batch="${b.id}" title="Dismiss">${ICON.close}</button></div>`
+        if (waiting) parts.push(`${join(b.pending.map(e => e.code))} ${waiting === 1 ? 'isn’t' : 'aren’t'} available from the source you picked — choose ${waiting === 1 ? 'its stream' : 'their streams'} yourself.`)
+        if (b.skipped.length) parts.push(`Skipped: ${join(b.skipped)}.`)
+        return `<div class="sdl-banner sdl-note-row sdl-batch-note">
+            <span><b>${esc(batchName(b))}:</b> ${esc(parts.join(' '))}</span>
+            ${waiting ? `<button class="sdl-pill sdl-primary" data-act="batch-pick" data-batch="${b.id}">Choose ${waiting === 1 ? 'a stream' : 'streams'}</button>` : ''}
+            <button class="sdl-icon" data-act="batch-dismiss" data-batch="${b.id}" title="${waiting ? 'Dismiss — the remaining episodes won’t be downloaded' : 'Dismiss'}">${ICON.close}</button></div>`
+    }
+
+    // --- výber streamov pre epizódy, ktoré z vybraného zdroja nie sú (#/?offline=1&pick=<dávka>) -------
+    let picker = null // { id, loading, stale, error, data, selected: Map(videoId → key), expanded: Set(videoId), filter }
+    const pickParam = () => new URLSearchParams(location.hash.split('?')[1] || '').get('pick')
+    const KIND_NAME = { torrent: 'Torrent', http: 'Direct link' }
+    // filter (napr. len priame odkazy, keď sa nedajú sťahovať torrenty) si pamätáme v tomto prehliadači
+    const savedFilter = () => { try { return localStorage.getItem('sdl-pick-filter') || 'all' } catch { return 'all' } }
+
+    async function loadPicker(id) {
+        const same = picker?.id === id
+        picker = { id, loading: true, stale: false, error: null, data: same ? picker.data : null,
+            selected: same ? picker.selected : new Map(), expanded: same ? picker.expanded : new Set(), filter: same ? picker.filter : savedFilter() }
+        const mine = picker
+        renderPage()
+        try {
+            mine.data = await api(`/season/batches/${id}/choices`)
+            // výbery pre epizódy, ktoré už nečakajú, zahodíme
+            const waiting = new Set(mine.data.episodes.map(e => e.videoId))
+            for (const v of [...mine.selected.keys()]) if (!waiting.has(v)) mine.selected.delete(v)
+        } catch (err) {
+            mine.error = err.message
+        }
+        mine.loading = false
+        if (picker === mine) renderPage()
+    }
+
+    function streamRow(ep, st) {
+        const on = picker.selected.get(ep.videoId) === st.key
+        const lines = t => esc(t).replace(/\n/g, '<br>')
+        return `<button type="button" class="sdl-stream" role="radio" aria-checked="${on}" data-act="pick-stream" data-video="${esc(ep.videoId)}" data-key="${esc(st.key)}">
+            <span class="sdl-radio"></span>
+            <span class="sdl-sname">${lines(st.name || 'Stream')}</span>
+            <span class="sdl-sdesc">${lines(st.description)}</span>
+            <span class="sdl-sbadges"><span class="sdl-tagk">${KIND_NAME[st.kind] || st.kind}</span>${st.closest ? '<span class="sdl-tagk sdl-good" title="Same kind and resolution as the stream you picked">Same quality</span>' : ''}</span>
+          </button>`
+    }
+
+    function renderPicker(id) {
+        if (picker?.id !== id || picker.stale) loadPicker(id)
+        const p = picker
+        const b = p.data?.batch || batches.find(x => x.id === id)
+        const eps = p.data?.episodes || []
+        const source = (b?.streamName || '').replace(/\s*\n\s*/g, ' ')
+        let head = `<div class="sdl-head"><button class="sdl-icon sdl-back" data-act="overview" title="Back to Offline">${ICON.back}</button>
+              <h1>Choose streams</h1><div class="sdl-meta">${esc(b ? batchName(b) : '')}</div></div>`
+        // filter má zmysel len keď sú oba druhy; inak ukážeme všetko (uložený filter by mohol skryť všetky streamy)
+        const kinds = new Set(eps.flatMap(e => e.streams.map(st => st.kind)))
+        const filter = kinds.size > 1 ? p.filter : 'all'
+        if (eps.length) {
+            head += `<p class="sdl-hint">${eps.length === 1 ? 'This episode isn’t' : `These ${eps.length} episodes aren’t`} available from the source you picked${source ? ` (<b>${esc(source)}</b>)` : ''}.
+                Nothing else is downloaded until you choose. Pick a stream for each episode, skip it, or open it in Stremio to use another add-on.</p>`
+            if (kinds.size > 1) {
+                head += `<div class="sdl-seg sdl-pick-filter" role="group" aria-label="Show">` + [['all', 'All streams'], ['http', 'Direct links'], ['torrent', 'Torrents']]
+                    .map(([f, label]) => `<button type="button" data-act="pick-filter" data-filter="${f}" aria-pressed="${filter === f}">${label}</button>`).join('') + `</div>`
+            }
+        }
+        let body = ''
+        if (p.error) body = `<div class="sdl-note">${esc(p.error)}</div>`
+        else if (p.loading && !p.data) body = `<div class="sdl-empty">Asking the add-on for the streams of each episode…</div>`
+        else if (!eps.length) body = `<div class="sdl-empty">${ICON.check}<br>Nothing left to choose.<br><br><button class="sdl-pill" data-act="overview">Back to Offline</button></div>`
+        else {
+            body = eps.map(ep => {
+                const all = ep.streams.filter(st => filter === 'all' || st.kind === filter)
+                const sel = p.selected.get(ep.videoId)
+                let shown = p.expanded.has(ep.videoId) ? all : all.slice(0, 5)
+                if (sel && !shown.some(st => st.key === sel)) shown = shown.concat(all.filter(st => st.key === sel))
+                const why = ep.error || (ep.reason === 'none' ? 'This add-on has no downloadable stream for this episode — open it in Stremio to use another add-on.'
+                    : !ep.streams.length ? 'The add-on returned no streams.'
+                    : !all.length ? `No ${filter === 'http' ? 'direct links' : 'torrents'} for this episode.` : '')
+                return `<section class="sdl-pick">
+                    <div class="sdl-pick-head">
+                      <div class="sdl-pick-title">${esc(ep.code)}${ep.title ? ` <span>· ${esc(ep.title)}</span>` : ''}</div>
+                      <button class="sdl-pill" data-act="pick-open" data-video="${esc(ep.videoId)}" title="Open the episode in Stremio to choose from all your add-ons">${ICON.info}Open in Stremio</button>
+                      <button class="sdl-pill" data-act="pick-skip" data-video="${esc(ep.videoId)}" title="Don’t download this episode">Skip</button>
+                    </div>
+                    ${why ? `<div class="sdl-pick-why">${esc(why)}</div>` : ''}
+                    ${shown.length ? `<div class="sdl-streams" role="radiogroup" aria-label="Streams for ${esc(ep.code)}">${shown.map(st => streamRow(ep, st)).join('')}</div>` : ''}
+                    ${all.length > shown.length ? `<button class="sdl-more" data-act="pick-more" data-video="${esc(ep.videoId)}">Show all ${all.length} streams</button>` : ''}
+                  </section>`
+            }).join('')
+            const chosen = eps.filter(ep => p.selected.has(ep.videoId)).length
+            body += `<div class="sdl-pick-foot"><span>${chosen ? `${chosen} of ${plural(eps.length, 'episode', 'episodes')} chosen` : 'Choose a stream for the episodes you want'}</span>
+                <button class="sdl-pill sdl-primary" data-act="pick-download"${chosen ? '' : ' disabled'}>${ICON.download}Download ${chosen ? plural(chosen, 'episode', 'episodes') : ''}</button></div>`
+        }
+        setSection('head', head)
+        setSection('active', '')
+        setSection('done', body)
+    }
+
+    async function pickChoose(picks, message) {
+        const res = await api(`/season/batches/${picker.id}/choose`, { method: 'POST', body: JSON.stringify({ picks }) })
+        for (const pk of picks) picker.selected.delete(pk.videoId)
+        if (res.errors?.length) toast(res.errors.join(' · '), 'error', null, 8000)
+        else if (message) toast(message(res), 'info', () => { location.hash = PAGE_HASH })
+        if (!res.batch.pending.length) location.hash = PAGE_HASH
+        else loadPicker(picker.id)
     }
 
     // filmy samostatne, epizódy toho istého seriálu spolu v jednom "priečinku" (stiahnuté aj z disku)
@@ -940,7 +1063,31 @@
                 await api(`/season/batches/${el.dataset.batch}/stop`, { method: 'POST' })
                 toast('Stopped adding episodes. The ones already added keep downloading.')
             } else if (act === 'batch-pick') {
-                location.hash = `#/detail/${encodeURIComponent(el.dataset.type)}/${encodeURIComponent(el.dataset.meta)}/${encodeURIComponent(el.dataset.video)}`
+                location.hash = PAGE_HASH + '&pick=' + encodeURIComponent(el.dataset.batch)
+            } else if (act === 'pick-stream' && picker) {
+                const { video, key } = el.dataset
+                if (picker.selected.get(video) === key) picker.selected.delete(video)
+                else picker.selected.set(video, key)
+                return renderPage()
+            } else if (act === 'pick-more' && picker) {
+                picker.expanded.add(el.dataset.video)
+                return renderPage()
+            } else if (act === 'pick-filter' && picker) {
+                picker.filter = el.dataset.filter
+                try { localStorage.setItem('sdl-pick-filter', picker.filter) } catch {}
+                return renderPage()
+            } else if (act === 'pick-open' && picker?.data) {
+                const b = picker.data.batch
+                location.hash = `#/detail/${encodeURIComponent(b.type)}/${encodeURIComponent(b.metaId)}/${encodeURIComponent(el.dataset.video)}`
+                return
+            } else if (act === 'pick-skip' && picker) {
+                const ep = picker.data?.episodes.find(e => e.videoId === el.dataset.video)
+                return await pickChoose([{ videoId: el.dataset.video, key: null }], () => `Skipped ${ep?.code || 'the episode'}`)
+            } else if (act === 'pick-download' && picker) {
+                const picks = [...picker.selected].map(([videoId, key]) => ({ videoId, key }))
+                if (!picks.length) return
+                el.disabled = true
+                return await pickChoose(picks, res => `Downloading ${plural(res.added.length, 'more episode', 'more episodes')} — ${res.added.join(', ')}`)
             } else if (act === 'batch-dismiss') {
                 await api(`/season/batches/${el.dataset.batch}`, { method: 'DELETE' })
                 batches = batches.filter(b => b.id !== el.dataset.batch)
@@ -1021,7 +1168,12 @@
                 api('/downloads'), api('/library?since=' + lib.version), settingsOpen ? api('/info') : null, api('/season/batches').catch(() => []),
             ])
             items = downloadsList
+            const before = new Map(batches.map(b => [b.id, b.status]))
             batches = batchList
+            for (const b of batches) {
+                if (before.get(b.id) === 'searching' && b.status !== 'searching' && b.pending.length && pickParam() !== b.id)
+                    toast(`${batchName(b)}: ${plural(b.pending.length, 'episode isn’t', 'episodes aren’t')} available from your source — click to choose`, 'info', () => { location.hash = PAGE_HASH + '&pick=' + b.id }, 10000)
+            }
             if (freshInfo) info = freshInfo
             if (!library.unchanged) lib = { version: library.version, busy: library.busy, folders: library.folders, items: library.items }
             refreshedOnce = true
@@ -1068,8 +1220,9 @@
         closeMenu()
         setPage(isPageHash())
         // prechod prehľad ↔ seriál v rámci otvorenej stránky
-        const series = pageOpen ? `${seriesParam()}|${viewParam()}` : null
+        const series = pageOpen ? `${seriesParam()}|${viewParam()}|${pickParam()}` : null
         if (pageOpen && series !== lastSeries) {
+            if (picker) picker.stale = true // po návrate (napr. z epizódy v Stremiu) načítame zoznam znova, výbery ostanú
             renderPage()
             page.scrollTop = 0
         }

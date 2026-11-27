@@ -3,7 +3,7 @@
 //  - Big Buck Bunny (tt1254207): priamy HTTP súbor a HLS (.m3u8)
 //  - seriál Chernobyl (tt7366338), séria 1: krátke lokálne testovacie videá (vyrobí ich ffmpeg) na skúšanie
 //    "stiahni celú sériu": 720p je pri každej epizóde, 1080p (rovnaký bingeGroup) iba pri E01–E03,
-//    E04 má podobný 1080p z inej skupiny, E05 1080p nemá
+//    E04 má podobný 1080p z inej skupiny (a jeden torrent), E05 1080p nemá
 // Spustenie: node dev/test-addon.mjs  →  v Stremiu nainštaluj http://127.0.0.1:11499/manifest.json
 // STREAM_DELAY_MS=1500 node dev/test-addon.mjs → pomalé odpovede (ako skutočné addony), dá sa sledovať priebeh
 import http from 'node:http'
@@ -53,7 +53,11 @@ for (let n = 1; n <= 5; n++) {
     const e = `S01E0${n}`
     const list = [local(`Chernobyl.${e}.720p.WEB.x264-TEST.mp4`, '720p', 'cc-local|720p|WEB')]
     if (n <= 3) list.unshift(local(`Chernobyl.${e}.1080p.WEB-DL.x265-GRP.mp4`, '1080p', 'cc-local|1080p|WEB-DL'))
-    if (n === 4) list.unshift(local(`Chernobyl.${e}.1080p.WEBRip.x265-OTHER.mp4`, '1080p', 'cc-local|1080p|WEBRip'))
+    if (n === 4) {
+        list.unshift(local(`Chernobyl.${e}.1080p.WEBRip.x265-OTHER.mp4`, '1080p', 'cc-local|1080p|WEBRip'))
+        // torrent (Sintel) — na skúšanie filtra "Direct links / Torrents" pri výbere streamu
+        list.push({ name: 'CC Torrent\n1080p', description: 'Sintel 1080p (stands in for a torrent of S01E04)', infoHash: '08ada5a7a6183aae1e09d831df6748d566095a10', fileIdx: 5 })
+    }
     streams[`tt7366338:1:${n}`] = list
 }
 

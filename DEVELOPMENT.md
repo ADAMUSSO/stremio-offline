@@ -69,7 +69,7 @@ server.js
 | `dev/` | development tools (below) |
 
 Data (Linux `~/.local/share/stremio-offline/`, macOS `~/Library/Application Support/stremio-offline/`):
-`downloads.json`, `library.json`, `settings.json`, `meta/`, `img/`, `web-cache/`, `tls/` (Linux), `addon-seen`.
+`downloads.json`, `library.json`, `settings.json`, `seasons.json`, `meta/`, `img/`, `web-cache/`, `tls/` (Linux), `addon-seen`.
 
 ## Development workflow
 
@@ -143,16 +143,23 @@ STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x
 
 - `POST /__dl/api/season/preview {href}` → the episode list of the season with `aired` and `state`
   (`offline` / `queued`) for the ⬇ menu; `POST /__dl/api/season {href, scope: 'season'|'rest'}` starts a batch;
-  `GET /__dl/api/season/batches`, `POST …/batches/:id/stop`, `DELETE …/batches/:id` (dismiss).
+  `GET /__dl/api/season/batches`, `POST …/batches/:id/stop`, `DELETE …/batches/:id` (dismiss),
+  `GET …/batches/:id/choices` (streams for the episodes waiting for a choice),
+  `POST …/batches/:id/choose {picks: [{videoId, key}]}` (`key` = `bt:{hash}:{idx}` / `url:{url}`, `null` = skip).
 - The player link has everything needed: the stream, the add-on's transport URL, the meta add-on, type, id and
   videoId. The episode list comes from the meta add-on (Cinemeta), other episodes' streams from
   `{transportUrl}/stream/{type}/{videoId}.json` — two requests at a time, added to the queue in episode order.
-- `pickSameSource()`: same `infoHash` (a season pack, a different `fileIdx`) or a hash in a debrid URL → same
-  `behaviorHints.bingeGroup` (Torrentio uses one per release, e.g. the same group and quality for every episode) →
-  otherwise "similar": same kind (torrent / HTTP), same resolution (or the same release group when there is none),
-  scored by release group, tags (WEB-DL, x265, HDR…) and the add-on's name line. Similar picks and episodes without a
-  match are reported in the batch.
-- Batches live in memory only (a lookup takes seconds); `season.isBusy()` keeps the helper running meanwhile.
+- **Only the exact source is added without asking** (the user's explicit requirement — they often use add-ons other
+  than Torrentio and sometimes cannot download torrents). `pickSameSource()`: same kind (torrent / HTTP) and either
+  the same `infoHash` (a season pack, a different `fileIdx`) or a hash in a debrid URL, or the same
+  `behaviorHints.bingeGroup` without a conflicting resolution or release group (Torrentio uses one bingeGroup per
+  release; other add-ons may use a looser one).
+- Everything else goes to `batch.pending` (`reason`: `different`, `none` = no downloadable stream, `error` = the
+  add-on did not answer) and waits for the user on the "Choose streams" view (`#/?offline=1&pick=<id>`).
+  `rankForChoice()` only orders that list (same kind and resolution first, marked `closest` → "Same quality");
+  nothing is preselected. "Open in Stremio" leads to the episode page for other add-ons.
+- Batches are saved in `seasons.json` (pending choices survive closing Stremio); stream lists are cached in memory
+  and fetched again when needed. `season.isBusy()` keeps the helper running while a lookup runs.
 - Episodes added by a batch have no Stremio-encoded stream (`streamEnc: null`). The ⬇ buttons match them by
   `sourceKey|videoId`: `inject.js` decodes the stream from the link (`DecompressionStream('deflate')`) to get the
   same `bt:{hash}:{fileIdx}` / `url:{url}` key as the server.
