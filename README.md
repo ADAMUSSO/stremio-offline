@@ -39,7 +39,7 @@ names and subtitles.
 | Platform | Status |
 |---|---|
 | **Linux** — Stremio from Flathub (`com.stremio.Stremio` 1.2+) | ✅ used daily |
-| **macOS** — Stremio 5 for macOS | 🧪 implemented, **not yet tested on a real Mac** — feedback welcome |
+| **macOS** — Stremio 5 for macOS | 🧪 fallback launcher, downloads and local playback verified on an Apple Silicon Mac with Stremio 5.1.31 |
 | **Windows** | ⏳ not yet (the code is prepared, the installer is missing) |
 
 ## How it works
@@ -63,12 +63,13 @@ Offline Stremio helper (127.0.0.1:11488)
    └─ a local Stremio add-on + file server             → Stremio's player plays the files from your disk
 ```
 
-How Stremio is pointed to the helper — **you keep starting Stremio from its normal icon**:
+How Stremio is pointed to the helper:
 
 - **Linux:** the installer adds a user-level D-Bus override so the Stremio app starts with
   `--url` pointing to the helper, and a systemd *socket* that starts the helper only when Stremio connects.
-- **macOS:** a small login agent sets `WEBUI_URL` for apps started from the Dock/Finder (Stremio 5 for macOS reads it
-  as `--webui-url`) and starts the helper whenever Stremio is running.
+- **macOS:** a small login agent sets `WEBUI_URL` for apps started from the Dock/Finder and starts the helper whenever
+  Stremio is running. If the normal icon opens the standard interface, the fallback launcher passes `--webui-url`
+  directly.
 
 The Stremio app itself is never modified, and the uninstaller restores the normal start.
 
@@ -117,6 +118,9 @@ You will see **Offline** in the left sidebar, under *Library*. You stay logged i
 
 ### 2b. macOS
 
+Keep the project in a permanent folder such as `~/Library/Application Support/Offline Stremio`.
+macOS can block the login agent from reading scripts stored in Documents, Desktop or Downloads.
+
 Open **Terminal** in the project folder and run:
 
 ```bash
@@ -130,8 +134,8 @@ Then **quit Stremio** (⌘Q) and open it again from the Dock or Applications as 
 - macOS shows a *"Background item added"* notice (the small login agent) and may ask whether **node** may access a
   removable volume or your Downloads folder — allow it. You can change this later in
   *System Settings → Privacy & Security*.
-- If the normal Stremio icon does not show the Offline section, install the fallback launcher and start Stremio with
-  **Stremio Offline** from Applications instead:
+- If the normal Stremio icon does not show the Offline section, install the fallback launcher, quit Stremio and open
+  **Stremio Offline** from your user's Applications folder (`~/Applications`):
 
   ```bash
   bash install-macos.sh --launcher
@@ -250,7 +254,9 @@ are (see *Where things are stored*); delete them yourself if you want.
 - Linux: `systemctl --user status stremio-offline.socket stremio-offline.service` and
   `journalctl --user -u stremio-offline -n 50`. If you updated Node.js (for example with nvm), its path changed —
   run `bash install.sh` again.
-- macOS: look at `~/Library/Logs/offline-stremio.log` and `offline-stremio-agent.log`.
+- macOS: look at `~/Library/Logs/offline-stremio.log` and `offline-stremio-agent.log`. If the agent reports
+  `Operation not permitted` for its script, move the project to the location above and rerun the installer.
+  Include `--launcher` if you use the fallback launcher.
 
 **There is no "Offline" in the sidebar.** Quit Stremio completely (Linux: also from the tray; macOS: ⌘Q) and start it
 again. On macOS try the fallback launcher (`bash install-macos.sh --launcher`).
@@ -273,7 +279,7 @@ Rename the file like `Title (Year).mkv` or `Show S01E02.mkv` and click **Rescan*
 
 - Stremio loads its interface from the internet and changes it from time to time; an update can break parts of the
   Offline section until this project is updated.
-- macOS support is not tested on real hardware yet. Windows is not supported yet.
+- Windows is not supported yet.
 - On macOS you have to log in to Stremio once more after installing.
 
 ## Development
