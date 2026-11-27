@@ -15,6 +15,8 @@ PORT="${PORT:-11488}"
 LABEL="community.offline-stremio"
 AGENT_PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LAUNCHER="$HOME/Applications/Stremio Offline.app"
+# launchd a Finder nemusia mať Homebrew v PATH; pomocník odtiaľ spúšťa ffmpeg.
+HELPER_PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
 WITH_LAUNCHER=0
 [[ "${1:-}" == "--launcher" ]] && WITH_LAUNCHER=1
 
@@ -61,6 +63,7 @@ cat > "$AGENT_PLIST" <<EOF
     </array>
     <key>EnvironmentVariables</key>
     <dict>
+        <key>PATH</key><string>$HELPER_PATH</string>
         <key>OFFLINE_STREMIO_NODE</key><string>$NODE</string>
         <key>OFFLINE_STREMIO_DIR</key><string>$DIR</string>
         <key>STREMIO_EXE</key><string>$EXE</string>
@@ -106,7 +109,7 @@ URL="http://127.0.0.1:\$PORT/"
 LOG="\$HOME/Library/Logs/offline-stremio.log"
 health() { curl -sf -m 1 "http://127.0.0.1:\$PORT/__dl/health" >/dev/null; }
 if ! health; then
-    IDLE_EXIT=1 PORT="\$PORT" nohup "\$NODE" "\$DIR/server.js" >>"\$LOG" 2>&1 &
+    PATH="$HELPER_PATH" IDLE_EXIT=1 PORT="\$PORT" nohup "\$NODE" "\$DIR/server.js" >>"\$LOG" 2>&1 &
     for _ in \$(seq 50); do health && break; sleep 0.2; done
 fi
 running="\$(ps -axww -o pid=,args= | grep -F "\$EXE" | grep -v grep | head -1)"
