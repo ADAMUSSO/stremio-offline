@@ -5,7 +5,9 @@
 //    "stiahni celú sériu": 720p je pri každej epizóde, 1080p (rovnaký bingeGroup) iba pri E01–E03,
 //    E04 má podobný 1080p z inej skupiny (a jeden torrent), E05 1080p nemá
 // Spustenie: node dev/test-addon.mjs  →  v Stremiu nainštaluj http://127.0.0.1:11499/manifest.json
+//  - Sherlock (tt1475582), série 1 a 2, a film Big Buck Bunny "CC Local" — viac sťahovaní naraz (zoskupenie v Downloading)
 // STREAM_DELAY_MS=1500 node dev/test-addon.mjs → pomalé odpovede (ako skutočné addony), dá sa sledovať priebeh
+// VIDEO_KBPS=100 node dev/test-addon.mjs → pomalé sťahovanie videí (dá sa skúšať pauza, priebeh, zoskupenie)
 import http from 'node:http'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -16,6 +18,7 @@ const PORT = Number(process.env.PORT || 11499)
 const BASE = `http://127.0.0.1:${PORT}`
 const VIDEO_DIR = path.join(os.tmpdir(), 'offline-stremio-test-videos')
 const STREAM_DELAY_MS = Number(process.env.STREAM_DELAY_MS || 0)
+const VIDEO_KBPS = Number(process.env.VIDEO_KBPS || 0)
 
 const manifest = {
     id: 'dev.offline-stremio.cc-streams',
@@ -61,11 +64,20 @@ for (let n = 1; n <= 5; n++) {
     streams[`tt7366338:1:${n}`] = list
 }
 
+// Sherlock S01–S02 (každá séria 3 epizódy) — jeden zdroj 720p
+for (const season of [1, 2]) {
+    for (let n = 1; n <= 3; n++) {
+        const e = `S0${season}E0${n}`
+        streams[`tt1475582:${season}:${n}`] = [local(`Sherlock.${e}.720p.WEB.x264-TEST.mp4`, '720p', 'cc-local|720p|WEB')]
+    }
+}
+streams.tt1254207.push(local('Big.Buck.Bunny.2008.360p.TEST.mp4', '360p', 'cc-local|360p'))
+
 function ensureVideo(file) {
     const target = path.join(VIDEO_DIR, file)
     if (fs.existsSync(target)) return target
     fs.mkdirSync(VIDEO_DIR, { recursive: true })
-    const label = file.replace(/^Chernobyl\./, '').replace(/\.mp4$/, '').replace(/[^A-Za-z0-9. -]/g, ' ')
+    const label = file.replace(/\.mp4$/, '').replace(/[^A-Za-z0-9. -]/g, ' ')
     execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=25:duration=20', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=20',
         '-vf', `drawtext=text='${label}':fontcolor=white:fontsize=28:box=1:boxcolor=black@0.6:x=(w-tw)/2:y=h-60`,
         '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', '-movflags', '+faststart', target])
@@ -94,7 +106,16 @@ function sendVideo(req, res, file) {
     }
     res.setHeader('content-length', end - start + 1)
     if (req.method === 'HEAD') return res.end()
-    fs.createReadStream(target, { start, end }).pipe(res)
+    const stream = fs.createReadStream(target, { start, end, highWaterMark: 16 * 1024 })
+    if (!VIDEO_KBPS) return stream.pipe(res)
+    // pomalé sťahovanie: 16 kB kúsky v takom tempe, aby to dalo VIDEO_KBPS
+    stream.on('data', chunk => {
+        stream.pause()
+        res.write(chunk)
+        setTimeout(() => stream.resume(), chunk.length / (VIDEO_KBPS * 1024) * 1000)
+    })
+    stream.on('end', () => res.end())
+    res.on('close', () => stream.destroy())
 }
 
 http.createServer((req, res) => {

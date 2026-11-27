@@ -189,7 +189,9 @@ Open **Offline** in the sidebar:
 - **Series** — each show is a folder card with the number of episodes. Open it to see the seasons and episodes you
   have and play any of them. Stremio continues to the next episode automatically.
 - **Downloading** — progress, speed, pause, resume and delete for running downloads, in the order they will be
-  downloaded.
+  downloaded. Episodes of the same show are bundled into one row (seasons and number of episodes, combined
+  progress and speed, which episodes are downloading and how many are waiting) with **pause all**, **resume all**
+  and **delete all**; click it to see the episodes, grouped by season.
 
 ### Add your own folders or an external drive
 

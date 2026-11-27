@@ -45,6 +45,7 @@
         season: icon(path('M176 64h208a48 48 0 0 1 48 48v208'), path('M128 128h208a48 48 0 0 1 48 48v224a48 48 0 0 1-48 48H128a48 48 0 0 1-48-48V176a48 48 0 0 1 48-48z'), path('M232 208v136m0 0-52-52m52 52 52-52')),
         forward: icon(path('M128 120v272l192-136z'), path('M384 120v272')),
         close: icon(path('M152 152l208 208M360 152 152 360')),
+        chevron: icon(path('M200 120l136 136-136 136')),
         drive: icon(path('M64 304h384v96a32 32 0 0 1-32 32H96a32 32 0 0 1-32-32zm0 0 48-176a32 32 0 0 1 31-24h226a32 32 0 0 1 31 24l48 176'), path('M368 368h.01', ';stroke-width:44')),
     }
 
@@ -212,6 +213,20 @@
     .sdl-menu-foot[data-type=error]{color:#ff9d94}
     .sdl-row.sdl-batch{background:rgba(123,91,245,.1)}
     .sdl-batch-note b{font-weight:700}
+    .sdl-h2-count{margin-left:.35rem;padding:.1rem .5rem;border-radius:1rem;background:rgba(255,255,255,.08);font-size:.8rem;font-weight:600;color:rgba(255,255,255,.65);vertical-align:.1rem}
+    .sdl-row.sdl-group{cursor:pointer}
+    .sdl-row.sdl-group:hover{background:rgba(255,255,255,.07)}
+    .sdl-row.sdl-group .sdl-kind{vertical-align:.05rem;display:inline-block;white-space:nowrap}
+    .sdl-toggle svg{width:1.15rem;height:1.15rem}
+    .sdl-toggle[aria-expanded=true] svg{transform:rotate(90deg)}
+    .sdl-group-items{display:flex;flex-direction:column;gap:.35rem;margin:-.15rem 0 .4rem 2rem;padding-left:1rem;border-left:2px solid rgba(255,255,255,.08)}
+    .sdl-group-season{margin:.45rem 0 .1rem;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+    .sdl-row.sdl-compact{grid-template-columns:1fr auto;padding:.5rem .5rem .6rem 1rem;background:rgba(255,255,255,.03)}
+    .sdl-row.sdl-compact .sdl-sub{grid-column:1}
+    .sdl-row.sdl-compact .sdl-actions{grid-column:2;grid-row:1/3}
+    .sdl-row.sdl-compact .sdl-bar{grid-column:1/3}
+    .sdl-page.sdl-narrow .sdl-group-items{margin-left:.5rem;padding-left:.6rem}
+    .sdl-page.sdl-narrow .sdl-group .sdl-title,.sdl-page.sdl-narrow .sdl-group .sdl-sub{white-space:normal}
     .sdl-pill:disabled{opacity:.45;cursor:default}
     .sdl-pill.sdl-primary:disabled:hover{background:#7b5bf5}
     .sdl-pick-filter{margin-top:1rem}
@@ -684,25 +699,9 @@
         const searching = batches.filter(b => b.status === 'searching')
         let activeHtml = ''
         if (active.length || searching.length) {
-            activeHtml = `<h2>Downloading</h2><div class="sdl-rows">` + searching.map(batchRow).join('') + active.map(it => {
-                const pct = pctOf(it)
-                const sub = it.status === 'downloading'
-                    ? (it.progress != null ? `${pct}% of ${it.size ? (it.sizeEstimated ? '~' : '') + fmtSize(it.size) : '?'}` : `${fmtSize(it.downloaded) || '0 MB'} downloaded`)
-                      + ` · ${fmtSpeed(it.speed) || 'connecting…'}`
-                    : it.status === 'queued' ? (it.error || 'Waiting…')
-                    : it.status === 'paused' ? `Paused at ${pct}%`
-                    : `Failed: ${it.error || 'unknown error'}`
-                return `<div class="sdl-row" data-status="${esc(it.status)}">
-                    ${it.thumbnail || it.poster ? `<img src="${esc(it.thumbnail || it.poster)}" alt="">` : '<div class="sdl-noimg"></div>'}
-                    <div class="sdl-title" title="${esc(it.streamName)}">${esc(it.title)}${it.isEpisode ? ' · ' + esc(epCode(it)) : ''}</div>
-                    <div class="sdl-actions">
-                      ${['downloading', 'queued'].includes(it.status) ? `<button class="sdl-icon" data-act="pause" data-id="${it.id}" title="Pause">${ICON.pause}</button>` : ''}
-                      ${['paused', 'error'].includes(it.status) ? `<button class="sdl-icon" data-act="resume" data-id="${it.id}" title="Resume">${ICON.retry}</button>` : ''}
-                      ${deleteButton(it)}
-                    </div>
-                    <div class="sdl-sub">${esc(sub)}</div>
-                    <div class="sdl-bar"><i style="width:${pct}%"></i></div></div>`
-            }).join('') + `</div>`
+            const count = active.length > 1 ? ` <span class="sdl-h2-count">${active.length}</span>` : ''
+            activeHtml = `<h2>Downloading${count}</h2><div class="sdl-rows">` + searching.map(batchRow).join('')
+                + groupActive(active).map(e => e.items ? groupRow(e) : activeRow(e.it)).join('') + `</div>`
         }
 
         const doneHtml =
@@ -712,6 +711,96 @@
         setSection('head', head)
         setSection('active', activeHtml)
         setSection('done', doneHtml)
+    }
+
+    // --- sekcia Downloading: epizódy toho istého seriálu spolu v jednom rozbaľovacom riadku ------------
+    const openGroups = new Set() // rozbalené seriály (metaId)
+    let pendingGroupDelete = null
+
+    function activeSub(it) {
+        const pct = pctOf(it)
+        return it.status === 'downloading'
+            ? (it.progress != null ? `${pct}% of ${it.size ? (it.sizeEstimated ? '~' : '') + fmtSize(it.size) : '?'}` : `${fmtSize(it.downloaded) || '0 MB'} downloaded`)
+              + ` · ${fmtSpeed(it.speed) || 'connecting…'}`
+            : it.status === 'queued' ? (it.error || 'Waiting…')
+            : it.status === 'paused' ? `Paused at ${pct}%`
+            : `Failed: ${it.error || 'unknown error'}`
+    }
+
+    // inGroup: kompaktný riadok epizódy v rozbalenom seriáli (bez obrázka a názvu seriálu)
+    function activeRow(it, inGroup = false) {
+        const name = inGroup ? [epCode(it), it.episodeTitle].filter(Boolean).join(' · ') : `${it.title}${it.isEpisode ? ' · ' + epCode(it) : ''}`
+        return `<div class="sdl-row${inGroup ? ' sdl-compact' : ''}" data-status="${esc(it.status)}">
+            ${inGroup ? '' : it.thumbnail || it.poster ? `<img src="${esc(it.thumbnail || it.poster)}" alt="">` : '<div class="sdl-noimg"></div>'}
+            <div class="sdl-title" title="${esc(it.streamName)}">${esc(name)}</div>
+            <div class="sdl-actions">
+              ${['downloading', 'queued'].includes(it.status) ? `<button class="sdl-icon" data-act="pause" data-id="${it.id}" title="Pause">${ICON.pause}</button>` : ''}
+              ${['paused', 'error'].includes(it.status) ? `<button class="sdl-icon" data-act="resume" data-id="${it.id}" title="Resume">${ICON.retry}</button>` : ''}
+              ${deleteButton(it)}
+            </div>
+            <div class="sdl-sub">${esc(activeSub(it))}</div>
+            <div class="sdl-bar"><i style="width:${pctOf(it)}%"></i></div></div>`
+    }
+
+    // filmy ostanú samostatne, epizódy jedného seriálu (2 a viac) idú do skupiny na mieste prvej z nich
+    function groupActive(active) {
+        const out = []
+        const bySeries = new Map()
+        for (const it of active) {
+            if (!it.isEpisode) { out.push({ it }); continue }
+            let g = bySeries.get(it.metaId)
+            if (!g) {
+                g = { key: it.metaId, title: it.title, poster: null, items: [] }
+                bySeries.set(it.metaId, g)
+                out.push(g)
+            }
+            g.poster = g.poster || it.poster
+            g.items.push(it)
+        }
+        return out.map(e => e.items?.length === 1 ? { it: e.items[0] } : e)
+    }
+
+    function groupRow(g) {
+        const open = openGroups.has(g.key)
+        const by = st => g.items.filter(i => i.status === st)
+        const downloading = by('downloading'), queued = by('queued'), paused = by('paused'), failed = by('error')
+        const seasons = [...new Set(g.items.map(i => i.season ?? null))].sort((a, b) => (a ?? 1e9) - (b ?? 1e9))
+        const episodes = [...g.items].sort((a, b) => (a.season ?? 1e9) - (b.season ?? 1e9) || (a.number ?? 0) - (b.number ?? 0))
+        // spoločný priebeh: stiahnuté / celková veľkosť, keď ju poznáme pri všetkých, inak priemer percent
+        const sum = (list, f) => list.reduce((n, i) => n + (f(i) || 0), 0)
+        const pct = g.items.every(i => i.size)
+            ? Math.floor(sum(g.items, i => i.downloaded) / sum(g.items, i => i.size) * 100)
+            : Math.floor(sum(g.items, pctOf) / g.items.length)
+        const speed = sum(downloading, i => i.speed)
+        const parts = []
+        if (downloading.length) parts.push(downloading.slice(0, 2).map(i => `${epCode(i)} ${i.progress != null ? pctOf(i) + '%' : '…'}`).join(', ') + (downloading.length > 2 ? ` +${downloading.length - 2}` : ''))
+        if (speed) parts.push(fmtSpeed(speed))
+        if (queued.length) parts.push(`${queued.length} waiting`)
+        if (paused.length) parts.push(`${paused.length} paused`)
+        if (failed.length) parts.push(`${failed.length} failed`)
+        const status = downloading.length ? 'downloading' : queued.length ? 'queued' : failed.length ? 'error' : 'paused'
+        const key = esc(g.key)
+        const what = seasons.length === 1 ? seasonName(seasons[0]) : plural(seasons.length, 'season', 'seasons')
+        let html = `<div class="sdl-row sdl-group" data-status="${status}" data-act="group-toggle" data-group="${key}" title="${open ? 'Hide' : 'Show'} the episodes">
+            ${g.poster ? `<img src="${esc(g.poster)}" alt="">` : '<div class="sdl-noimg"></div>'}
+            <div class="sdl-title">${esc(g.title)} <span class="sdl-kind">${esc(what)} · ${plural(g.items.length, 'episode', 'episodes')}</span></div>
+            <div class="sdl-actions">
+              ${downloading.length + queued.length ? `<button class="sdl-icon" data-act="group-pause" data-group="${key}" title="Pause all episodes">${ICON.pause}</button>` : ''}
+              ${paused.length + failed.length ? `<button class="sdl-icon" data-act="group-resume" data-group="${key}" title="Resume all episodes">${ICON.retry}</button>` : ''}
+              ${pendingGroupDelete === g.key
+                ? `<button class="sdl-icon" data-act="group-delete" data-group="${key}" data-confirm title="Click again to delete all ${g.items.length} downloads">Delete all?</button>`
+                : `<button class="sdl-icon" data-act="group-delete" data-group="${key}" title="Delete all these downloads">${ICON.trash}</button>`}
+              <button class="sdl-icon sdl-toggle" data-act="group-toggle" data-group="${key}" aria-expanded="${open}" title="${open ? 'Hide' : 'Show'} the episodes">${ICON.chevron}</button>
+            </div>
+            <div class="sdl-sub">${esc(parts.join(' · '))}</div>
+            <div class="sdl-bar"><i style="width:${pct}%"></i></div></div>`
+        if (open) {
+            html += `<div class="sdl-group-items">` + seasons.map(season =>
+                (seasons.length > 1 ? `<div class="sdl-group-season">${esc(seasonName(season))}</div>` : '')
+                + episodes.filter(i => (i.season ?? null) === season).map(i => activeRow(i, true)).join('')
+            ).join('') + `</div>`
+        }
+        return html
     }
 
     // "stiahni celú sériu": počas hľadania riadok s priebehom v sekcii Downloading
@@ -1059,6 +1148,28 @@
             else if (act === 'folders') location.hash = PAGE_HASH + '&view=folders'
             else if (act === 'details-series') location.hash = `#/detail/${encodeURIComponent(el.dataset.type)}/${encodeURIComponent(el.dataset.meta)}`
             else if (act === 'pause' || act === 'resume') await api(`/downloads/${id}/${act}`, { method: 'POST' })
+            else if (act === 'group-toggle') {
+                const key = el.dataset.group
+                if (openGroups.has(key)) openGroups.delete(key)
+                else openGroups.add(key)
+                return renderPage()
+            } else if (act === 'group-pause' || act === 'group-resume') {
+                const from = act === 'group-pause' ? ['downloading', 'queued'] : ['paused', 'error']
+                const list = items.filter(i => i.metaId === el.dataset.group && i.status !== 'done' && from.includes(i.status))
+                await Promise.all(list.map(i => api(`/downloads/${i.id}/${act === 'group-pause' ? 'pause' : 'resume'}`, { method: 'POST' }).catch(() => null)))
+            } else if (act === 'group-delete') {
+                const key = el.dataset.group
+                if (pendingGroupDelete !== key) {
+                    pendingGroupDelete = key
+                    setTimeout(() => { if (pendingGroupDelete === key) { pendingGroupDelete = null; renderPage() } }, 4000)
+                    return renderPage()
+                }
+                pendingGroupDelete = null
+                const list = items.filter(i => i.metaId === key && i.status !== 'done')
+                await Promise.all(list.map(i => api(`/downloads/${i.id}`, { method: 'DELETE' }).catch(() => null)))
+                openGroups.delete(key)
+                toast(`Deleted ${plural(list.length, 'download', 'downloads')} of “${list[0]?.title || ''}”`)
+            }
             else if (act === 'batch-stop') {
                 await api(`/season/batches/${el.dataset.batch}/stop`, { method: 'POST' })
                 toast('Stopped adding episodes. The ones already added keep downloading.')

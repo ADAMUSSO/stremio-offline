@@ -77,7 +77,9 @@ Data (Linux `~/.local/share/stremio-offline/`, macOS `~/Library/Application Supp
 # development instance on ports 11590/11591 with its own data (the installed one keeps running)
 npm run dev
 # test add-on: Creative Commons streams (Sintel torrent, Big Buck Bunny HTTP + HLS) and generated videos for
-# season 1 of Chernobyl (tt7366338) to test season downloads; STREAM_DELAY_MS=2500 makes it slow like real add-ons
+# season 1 of Chernobyl (tt7366338), seasons 1–2 of Sherlock (tt1475582) and a local Big Buck Bunny, to test season
+# downloads and the grouped Downloading list. STREAM_DELAY_MS=2500 = slow add-on answers like real add-ons,
+# VIDEO_KBPS=60 = slow video downloads (to see progress, pause and the groups)
 npm run test-addon
 # fake drive with tiny videos (movies, series, subtitles, an unmatched home video)
 npm run test-library
