@@ -15,6 +15,8 @@
 
     let items = []
     let byEnc = new Map()
+    let byKey = new Map() // "zdroj|epizóda" → sťahovanie (aj epizódy pridané celou sériou)
+    let batches = [] // prebiehajúce / dokončené "stiahni celú sériu"
     let info = { manifestUrl: BASE + '/addon/manifest.json', addonSeen: true }
     let pageOpen = false
     let pendingDelete = null
@@ -39,6 +41,10 @@
         plus: icon(path('M256 112v288M112 256h288')),
         search: icon(path('M221 80a141 141 0 1 0 0 282 141 141 0 0 0 0-282zm105 246 106 106')),
         settings: icon(path('M262.3 64h-12.6a24 24 0 0 0-23.6 19.6l-4.8 26.3a147 147 0 0 0-37.9 21.9l-25.2-8.9a24 24 0 0 0-28.6 10.6l-6.3 10.9a24 24 0 0 0 5 30.3l20.4 17.4a148 148 0 0 0 0 43.8l-20.4 17.4a24 24 0 0 0-5 30.3l6.3 10.9a24 24 0 0 0 28.6 10.6l25.2-8.9a147 147 0 0 0 37.9 21.9l4.8 26.3a24 24 0 0 0 23.6 19.6h12.6a24 24 0 0 0 23.6-19.6l4.8-26.3a147 147 0 0 0 37.9-21.9l25.2 8.9a24 24 0 0 0 28.6-10.6l6.3-10.9a24 24 0 0 0-5-30.3l-20.4-17.4a148 148 0 0 0 0-43.8l20.4-17.4a24 24 0 0 0 5-30.3l-6.3-10.9a24 24 0 0 0-28.6-10.6l-25.2 8.9a147 147 0 0 0-37.9-21.9l-4.8-26.3A24 24 0 0 0 262.3 64z'), path('M256 192a64 64 0 1 0 0 128 64 64 0 0 0 0-128z')),
+        // kôpka epizód so šípkou (celá séria) a "ďalej" (zvyšok série)
+        season: icon(path('M176 64h208a48 48 0 0 1 48 48v208'), path('M128 128h208a48 48 0 0 1 48 48v224a48 48 0 0 1-48 48H128a48 48 0 0 1-48-48V176a48 48 0 0 1 48-48z'), path('M232 208v136m0 0-52-52m52 52 52-52')),
+        forward: icon(path('M128 120v272l192-136z'), path('M384 120v272')),
+        close: icon(path('M152 152l208 208M360 152 152 360')),
         drive: icon(path('M64 304h384v96a32 32 0 0 1-32 32H96a32 32 0 0 1-32-32zm0 0 48-176a32 32 0 0 1 31-24h226a32 32 0 0 1 31 24l48 176'), path('M368 368h.01', ';stroke-width:44')),
     }
 
@@ -189,6 +195,27 @@
     .sdl-page.sdl-narrow .sdl-ep{grid-template-columns:6.5rem 1fr auto}
     .sdl-page.sdl-narrow .sdl-browser-foot .sdl-grow{display:none}
 
+    /* ponuka pri ⬇ epizódy (bez prechodov — WebKitGTK v Stremiu pri nich bliká) */
+    .sdl-menu{position:fixed;z-index:2147483000;width:19rem;max-width:calc(100vw - 1rem);padding:.4rem;box-sizing:border-box;border-radius:1rem;
+      background:#1f1d33;box-shadow:0 12px 40px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.07);color:#fff;font-family:PlusJakartaSans,Arial,sans-serif}
+    .sdl-menu-head{padding:.55rem .75rem .4rem;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.45);
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sdl-menu button{width:100%;border:0;background:transparent;color:inherit;display:grid;grid-template-columns:2.25rem 1fr;align-items:center;gap:.1rem .75rem;
+      padding:.55rem .75rem .55rem .5rem;border-radius:.7rem;cursor:pointer;text-align:left;font:inherit}
+    .sdl-menu button:hover:not(:disabled),.sdl-menu button:focus-visible{background:rgba(255,255,255,.08);outline:none}
+    .sdl-menu button:disabled{cursor:default;opacity:.45}
+    .sdl-menu .sdl-mi{grid-row:1/3;width:2.25rem;height:2.25rem;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(123,91,245,.2);color:#cfc3ff}
+    .sdl-menu .sdl-mi svg{width:1.15rem;height:1.15rem}
+    .sdl-menu b{font-weight:600;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sdl-menu small{grid-column:2;color:rgba(255,255,255,.55);font-size:.78rem;line-height:1.35}
+    .sdl-menu-foot{margin:.35rem .5rem .25rem;padding:.6rem .25rem 0;border-top:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.45);font-size:.75rem;line-height:1.45}
+    .sdl-menu-foot[data-type=error]{color:#ff9d94}
+    .sdl-row.sdl-batch{background:rgba(123,91,245,.1)}
+    .sdl-batch-note b{font-weight:700}
+    .sdl-batch-note .sdl-icon{color:inherit;opacity:.75}
+    .sdl-batch-note .sdl-icon:hover{opacity:1}
+    .sdl-banner.sdl-batch-note{margin-top:1rem;padding:.75rem 1rem;font-size:.9rem;color:rgba(255,255,255,.85)}
+
     .sdl-toast{position:fixed;left:50%;bottom:2rem;transform:translateX(-50%);z-index:2147483001;max-width:min(36rem,90vw);
       padding:.8rem 1.2rem;border-radius:.75rem;background:#2b2940;color:#fff;font:14px/1.4 PlusJakartaSans,sans-serif;
       box-shadow:0 8px 30px rgba(0,0,0,.5);transition:opacity .3s;will-change:opacity;cursor:pointer}
@@ -236,12 +263,38 @@
     // --- tlačidlo ⬇ pri streame ---------------------------------------------------
     const stopAll = e => e.stopPropagation()
 
+    // časti odkazu "#/player/{stream}/{addon}/{meta addon}/{type}/{id}/{videoId}"
+    function hrefParts(href) {
+        const seg = (href.includes('#') ? href.slice(href.indexOf('#') + 1) : href).replace(/^\/+/, '').split('?')[0].split('/')
+        const dec = v => { try { return v ? decodeURIComponent(v) : null } catch { return null } }
+        return { type: dec(seg[4]), id: dec(seg[5]), videoId: dec(seg[6]) || dec(seg[5]) }
+    }
+    const isEpisodeLink = a => { const p = hrefParts(a.getAttribute('href') || ''); return !!p.videoId && p.videoId !== p.id }
+
+    // Epizódy pridané cez "celú sériu" nemajú zakódovaný stream zo Stremia → spárujeme ich podľa zdroja
+    // (torrent+súbor alebo URL), ktorý prečítame zo zakódovaného streamu v odkaze: base64(zlib(JSON))
+    const keyCache = new Map()
+    async function sourceKeyOf(enc) {
+        if (keyCache.has(enc)) return keyCache.get(enc)
+        keyCache.set(enc, '')
+        try {
+            const bin = Uint8Array.from(atob(decodeURIComponent(enc)), c => c.charCodeAt(0))
+            const text = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('deflate'))).text()
+            const s = JSON.parse(text)
+            keyCache.set(enc, s.infoHash ? `bt:${String(s.infoHash).toLowerCase()}:${s.fileIdx ?? ''}` : s.url ? `url:${s.url}` : '')
+        } catch {}
+        return keyCache.get(enc)
+    }
+    const itemFor = a => byEnc.get(a.dataset.sdlEnc) || byKey.get(`${keyCache.get(a.dataset.sdlEnc) || '-'}|${a.dataset.sdlVideo}`)
+
     function decorate(a) {
         const enc = encOf(a.getAttribute('href') || '')
         if (!enc || a.textContent.includes(OFFLINE_NAME)) {
             a.querySelector(':scope > .sdl-btn')?.remove()
             return
         }
+        a.dataset.sdlVideo = hrefParts(a.getAttribute('href')).videoId || ''
+        if (!keyCache.has(enc)) sourceKeyOf(enc).then(() => updateBtn(a))
         if (a.dataset.sdlEnc === enc && a.querySelector(':scope > .sdl-btn')) return updateBtn(a)
         a.dataset.sdlEnc = enc
         if (getComputedStyle(a).position === 'static') a.style.position = 'relative'
@@ -261,15 +314,25 @@
     function updateBtn(a) {
         const btn = a.querySelector(':scope > .sdl-btn')
         if (!btn || btn.dataset.state === 'starting') return
-        const item = byEnc.get(a.dataset.sdlEnc)
+        const item = itemFor(a)
         const state = item ? item.status : 'none'
+        const episode = isEpisodeLink(a)
+        btn.setAttribute('aria-haspopup', episode ? 'menu' : 'false')
+        if (!btn.hasAttribute('aria-expanded') && episode) btn.setAttribute('aria-expanded', 'false')
         if (btn.dataset.state === state && state !== 'downloading' && state !== 'queued') return
         btn.dataset.state = state
         const pct = item?.progress != null ? pctOf(item) : null
         btn.style.setProperty('--p', (pct || 0) + '%')
         if (state === 'downloading' || state === 'queued') btn.textContent = pct != null ? `${pct}%` : '…'
         else btn.innerHTML = { done: ICON.check, error: ICON.retry, paused: ICON.pause }[state] || ICON.download
-        btn.title = {
+        btn.title = episode ? {
+            none: 'Download this episode or the whole season',
+            queued: 'Waiting to download — more options',
+            downloading: 'Downloading — more options',
+            done: 'Downloaded — more options',
+            error: `Download failed: ${item?.error || ''} — more options`,
+            paused: 'Paused — more options',
+        }[state] : {
             none: 'Download for offline',
             queued: 'Waiting to download — click to open Offline',
             downloading: 'Downloading — click to open Offline',
@@ -279,12 +342,21 @@
         }[state]
     }
 
-    async function onStreamButton(e) {
+    function onStreamButton(e) {
         e.preventDefault()
         e.stopPropagation()
         const btn = e.currentTarget
         const a = btn.closest('a')
-        const item = byEnc.get(a.dataset.sdlEnc)
+        // epizóda: ponuka (táto epizóda / celá séria / zvyšok série); film: hneď
+        if (isEpisodeLink(a)) {
+            if (menu?.btn === btn) return closeMenu()
+            return openMenu(btn, a)
+        }
+        episodeAction(btn, a)
+    }
+
+    async function episodeAction(btn, a) {
+        const item = itemFor(a)
         try {
             if (item && (item.status === 'error' || item.status === 'paused')) {
                 await api(`/downloads/${item.id}/resume`, { method: 'POST' })
@@ -303,6 +375,156 @@
             refresh()
         }
     }
+
+    async function seasonAction(btn, a, scope) {
+        btn.dataset.state = 'starting'
+        try {
+            const b = await api('/season', { method: 'POST', body: JSON.stringify({ href: a.getAttribute('href'), scope }) })
+            batches = [b, ...batches.filter(x => x.id !== b.id)]
+            toast(`Downloading ${b.title} · ${b.seasonLabel}${b.from ? ` from ${b.from}` : ''} — ${plural(b.total, 'episode', 'episodes')}. Click to see progress`, 'info', () => { location.hash = PAGE_HASH })
+        } catch (err) {
+            toast(err.message, 'error')
+        } finally {
+            if (btn.dataset.state === 'starting') btn.dataset.state = ''
+            refresh()
+        }
+    }
+
+    // --- ponuka pri ⬇ epizódy ---------------------------------------------------------
+    let menu = null // { el, btn, a, preview, error }
+
+    function closeMenu(focusButton = false) {
+        if (!menu) return
+        const { el, btn } = menu
+        menu = null
+        el.remove()
+        btn.setAttribute('aria-expanded', 'false')
+        if (focusButton) btn.focus({ preventScroll: true })
+    }
+
+    async function openMenu(btn, a) {
+        closeMenu()
+        const el = document.createElement('div')
+        el.className = 'sdl-menu'
+        el.setAttribute('role', 'menu')
+        el.addEventListener('click', onMenuClick)
+        el.addEventListener('keydown', onMenuKey)
+        for (const ev of ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'contextmenu', 'keyup']) el.addEventListener(ev, stopAll)
+        const mine = { el, btn, a, preview: null, error: null }
+        menu = mine
+        btn.setAttribute('aria-expanded', 'true')
+        document.body.appendChild(el)
+        renderMenu()
+        el.querySelector('button:not(:disabled)')?.focus({ preventScroll: true })
+        try {
+            mine.preview = await api('/season/preview', { method: 'POST', body: JSON.stringify({ href: a.getAttribute('href') }) })
+        } catch (err) {
+            mine.error = err.message
+        }
+        if (menu === mine) renderMenu()
+    }
+
+    const menuButton = (act, ico, label, sub, disabled = false) =>
+        `<button type="button" role="menuitem" data-mact="${act}"${disabled ? ' disabled' : ''}><span class="sdl-mi">${ico}</span><b>${esc(label)}</b><small>${esc(sub)}</small></button>`
+
+    // "7 episodes · 2 already offline · 1 not aired yet"
+    function describeEpisodes(list) {
+        const want = list.filter(e => e.aired && !e.state).length
+        const offline = list.filter(e => e.state === 'offline').length
+        const queued = list.filter(e => e.state === 'queued').length
+        const upcoming = list.filter(e => !e.aired && !e.state).length
+        const parts = [want ? plural(want, 'episode', 'episodes') : offline + queued ? 'Already offline or downloading' : 'Nothing to download yet']
+        if (want && offline) parts.push(`${offline} already offline`)
+        if (want && queued) parts.push(`${queued} downloading`)
+        if (upcoming) parts.push(`${upcoming} not aired yet`)
+        return { want, text: parts.join(' · ') }
+    }
+
+    function renderMenu() {
+        if (!menu) return
+        const { el, a, preview, error } = menu
+        const item = itemFor(a)
+        const vid = hrefParts(a.getAttribute('href') || '').videoId || ''
+        const guess = vid.match(/:(\d+):(\d+)$/)
+        const code = preview?.episodes.find(e => e.id === preview.current)?.code || (guess ? `S${pad2(guess[1])}E${pad2(guess[2])}` : 'This episode')
+
+        const ep = !item ? { label: 'Download this episode', sub: code, icon: ICON.download }
+            : item.status === 'done' ? { label: 'Show in Offline', sub: `${code} · downloaded`, icon: ICON.check }
+            : item.status === 'paused' ? { label: 'Resume this episode', sub: `${code} · paused at ${pctOf(item)}%`, icon: ICON.retry }
+            : item.status === 'error' ? { label: 'Retry this episode', sub: `${code} · ${item.error || 'download failed'}`, icon: ICON.retry }
+            : { label: 'Show download progress', sub: `${code} · ${item.progress != null ? pctOf(item) + '%' : 'waiting'}`, icon: ICON.offline }
+
+        let html = `<div class="sdl-menu-head">${esc(preview?.title ? `Download · ${preview.title}` : 'Download for offline')}</div>`
+        html += menuButton('episode', ep.icon, ep.label, ep.sub)
+        if (error) {
+            html += `<div class="sdl-menu-foot" data-type="error">${esc(error)}</div>`
+        } else if (!preview) {
+            html += menuButton('season', ICON.season, 'Download the whole season', 'Checking episodes…', true)
+        } else if (preview.episodes.length > 1) {
+            const eps = preview.episodes
+            const idx = Math.max(0, eps.findIndex(e => e.id === preview.current))
+            const all = describeEpisodes(eps)
+            const rest = describeEpisodes(eps.slice(idx))
+            const name = preview.season == null ? 'all episodes' : preview.season === 0 ? 'all specials' : `season ${preview.season}`
+            html += menuButton('season', ICON.season, `Download ${name}`, all.text, !all.want || !preview.canSearch)
+            if (idx > 0 && rest.want && rest.want !== all.want)
+                html += menuButton('rest', ICON.forward, preview.season == null ? `Download from ${code} on` : `Download the rest of ${name}`, `From ${code} · ${rest.text}`, !preview.canSearch)
+            html += `<div class="sdl-menu-foot">${preview.canSearch
+                ? 'Every episode comes from this same source. If the add-on doesn’t have it for an episode, a similar one in the same quality is used.'
+                : 'This stream doesn’t come from an add-on, so the other episodes can’t be looked up.'}</div>`
+        }
+        if (el.__html === html) return
+        const focused = el.querySelector('button:focus')?.dataset.mact
+        el.__html = html
+        el.innerHTML = html
+        if (focused) el.querySelector(`button[data-mact="${focused}"]:not(:disabled)`)?.focus({ preventScroll: true })
+        placeMenu()
+    }
+
+    // pod tlačidlo, zarovnané k jeho pravému okraju; keď sa nezmestí dole, nad tlačidlo
+    function placeMenu() {
+        if (!menu) return
+        const { el, btn } = menu
+        const r = btn.getBoundingClientRect()
+        if (!r.width) return closeMenu()
+        const w = el.offsetWidth
+        const h = el.offsetHeight
+        const gap = 6
+        const left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8)
+        let top = r.bottom + gap
+        if (top + h > window.innerHeight - 8 && r.top - gap - h >= 8) top = r.top - gap - h
+        el.style.left = left + 'px'
+        el.style.top = Math.max(8, top) + 'px'
+    }
+
+    function onMenuClick(e) {
+        e.stopPropagation()
+        const b = e.target.closest('button[data-mact]')
+        if (!b || b.disabled || !menu) return
+        const { btn, a } = menu
+        closeMenu()
+        if (b.dataset.mact === 'episode') episodeAction(btn, a)
+        else seasonAction(btn, a, b.dataset.mact)
+    }
+
+    function onMenuKey(e) {
+        e.stopPropagation() // klávesové skratky Stremia (Esc = späť, šípky...) sa nespustia
+        const buttons = [...menu.el.querySelectorAll('button:not(:disabled)')]
+        const i = buttons.indexOf(document.activeElement)
+        if (e.key === 'Escape') { e.preventDefault(); closeMenu(true) }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); buttons[(i + 1) % buttons.length]?.focus() }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); buttons[(i - 1 + buttons.length) % buttons.length]?.focus() }
+        else if (e.key === 'Home') { e.preventDefault(); buttons[0]?.focus() }
+        else if (e.key === 'End') { e.preventDefault(); buttons[buttons.length - 1]?.focus() }
+        else if (e.key === 'Tab') closeMenu(true)
+    }
+
+    document.addEventListener('pointerdown', e => {
+        if (menu && !menu.el.contains(e.target) && e.target.closest?.('.sdl-btn') !== menu.btn) closeMenu()
+    }, true)
+    document.addEventListener('scroll', e => { if (menu && !menu.el.contains(e.target)) closeMenu() }, true)
+    window.addEventListener('resize', () => closeMenu())
+    window.addEventListener('blur', () => closeMenu())
 
     // --- položka "Offline" v bočnom menu -------------------------------------------
     function addNavItems() {
@@ -396,7 +618,9 @@
         const series = seriesParam()
         if (series) return renderSeries(series)
 
-        const active = items.filter(i => i.status !== 'done')
+        // poradie fronty: čo sa práve sťahuje, potom čo príde na rad (epizódy série v poradí), nakoniec pozastavené a chyby
+        const RANK = { downloading: 0, queued: 1, paused: 2, error: 3 }
+        const active = items.filter(i => i.status !== 'done').sort((a, b) => (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9) || a.createdAt - b.createdAt)
         const done = allDone()
         const groups = groupDone(done)
         const movies = groups.filter(g => g.kind === 'movie').map(g => g.item).sort(byTitle)
@@ -420,14 +644,17 @@
         if (moved) head += `<div class="sdl-note sdl-note-row"><span>${plural(moved, 'downloaded video was', 'downloaded videos were')} moved or deleted outside Stremio.
             If you moved ${moved === 1 ? 'it' : 'them'} into a library folder, ${moved === 1 ? 'it shows' : 'they show'} up there automatically.</span>
             <button class="sdl-pill" data-act="forget-moved" title="Only removes the entries, no files are touched">Remove from list</button></div>`
-        if (!done.length && !active.length && !unavailable.length) {
+        if (!done.length && !active.length && !unavailable.length && !batches.length) {
             head += `<div class="sdl-empty">${ICON.offline}<br>Nothing here yet.<br>Press ⬇ next to a stream to download it, or add a folder with movies or series from your disk.<br><br>
                 <button class="sdl-pill sdl-primary" data-act="folders">${ICON.folder}Add a folder</button></div>`
         }
 
+        // dokončené "celé série", pri ktorých niečo treba vedieť (chýbajúce epizódy, podobný zdroj) → poznámka hore
+        head += batches.filter(b => b.status !== 'searching').map(batchNote).join('')
+        const searching = batches.filter(b => b.status === 'searching')
         let activeHtml = ''
-        if (active.length) {
-            activeHtml = `<h2>Downloading</h2><div class="sdl-rows">` + active.map(it => {
+        if (active.length || searching.length) {
+            activeHtml = `<h2>Downloading</h2><div class="sdl-rows">` + searching.map(batchRow).join('') + active.map(it => {
                 const pct = pctOf(it)
                 const sub = it.status === 'downloading'
                     ? (it.progress != null ? `${pct}% of ${it.size ? (it.sizeEstimated ? '~' : '') + fmtSize(it.size) : '?'}` : `${fmtSize(it.downloaded) || '0 MB'} downloaded`)
@@ -455,6 +682,37 @@
         setSection('head', head)
         setSection('active', activeHtml)
         setSection('done', doneHtml)
+    }
+
+    // "stiahni celú sériu": počas hľadania riadok s priebehom v sekcii Downloading
+    const batchName = b => `${b.title} · ${b.seasonLabel}${b.from ? ` from ${b.from}` : ''}`
+    function batchRow(b) {
+        const pct = b.total ? Math.round(b.checked / b.total * 100) : 0
+        return `<div class="sdl-row sdl-batch" data-status="searching">
+            ${b.poster ? `<img src="${esc(b.poster)}" alt="">` : '<div class="sdl-noimg"></div>'}
+            <div class="sdl-title" title="${esc(b.streamName)}">${esc(batchName(b))}</div>
+            <div class="sdl-actions"><button class="sdl-icon" data-act="batch-stop" data-batch="${b.id}" title="Stop adding episodes — the ones already added keep downloading">${ICON.close}</button></div>
+            <div class="sdl-sub">Finding this source for every episode · ${b.checked} of ${b.total}</div>
+            <div class="sdl-bar"><i style="width:${pct}%"></i></div></div>`
+    }
+
+    // ...a po dokončení poznámka: čo sa pridalo, čo z tohto zdroja nie je (s odkazom na epizódu, kde si vyberie iný stream)
+    function batchNote(b) {
+        const join = list => list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0]
+        const added = b.queued.length
+        const parts = [b.status === 'stopped' ? `Stopped — ${added} of ${plural(b.total, 'episode', 'episodes')} added.`
+            : added === b.total ? `All ${plural(b.total, 'episode', 'episodes')} added.` : `${added} of ${plural(b.total, 'episode', 'episodes')} added.`]
+        if (b.notFound.length) parts.push(`${join(b.notFound)} ${b.notFound.length === 1 ? 'isn’t' : 'aren’t'} available from this source.`)
+        if (b.failed.length) parts.push(`The add-on didn’t answer for ${join(b.failed)}.`)
+        if (b.similar.length) parts.push(`${join(b.similar)} ${b.similar.length === 1 ? 'uses' : 'use'} a similar source in the same quality.`)
+        const first = b.missingIds?.[0]
+        const missing = b.notFound.length + b.failed.length
+        const pick = first
+            ? `<button class="sdl-pill" data-act="batch-pick" data-type="${esc(b.type)}" data-meta="${esc(b.metaId)}" data-video="${esc(first)}" title="Opens the episode — choose a different stream there">Choose a stream${missing > 1 ? ` for ${esc([...b.notFound, ...b.failed][0])}` : ''}</button>`
+            : ''
+        return `<div class="${missing ? 'sdl-note' : 'sdl-banner'} sdl-note-row sdl-batch-note">
+            <span><b>${esc(batchName(b))}:</b> ${esc(parts.join(' '))}</span>${pick}
+            <button class="sdl-icon" data-act="batch-dismiss" data-batch="${b.id}" title="Dismiss">${ICON.close}</button></div>`
     }
 
     // filmy samostatne, epizódy toho istého seriálu spolu v jednom "priečinku" (stiahnuté aj z disku)
@@ -678,6 +936,15 @@
             else if (act === 'folders') location.hash = PAGE_HASH + '&view=folders'
             else if (act === 'details-series') location.hash = `#/detail/${encodeURIComponent(el.dataset.type)}/${encodeURIComponent(el.dataset.meta)}`
             else if (act === 'pause' || act === 'resume') await api(`/downloads/${id}/${act}`, { method: 'POST' })
+            else if (act === 'batch-stop') {
+                await api(`/season/batches/${el.dataset.batch}/stop`, { method: 'POST' })
+                toast('Stopped adding episodes. The ones already added keep downloading.')
+            } else if (act === 'batch-pick') {
+                location.hash = `#/detail/${encodeURIComponent(el.dataset.type)}/${encodeURIComponent(el.dataset.meta)}/${encodeURIComponent(el.dataset.video)}`
+            } else if (act === 'batch-dismiss') {
+                await api(`/season/batches/${el.dataset.batch}`, { method: 'DELETE' })
+                batches = batches.filter(b => b.id !== el.dataset.batch)
+            }
             else if (act === 'browse') return loadBrowse(el.dataset.path)
             else if (act === 'kind') {
                 browse = { ...(browse || {}), kind: el.dataset.kind }
@@ -750,10 +1017,11 @@
     async function refresh() {
         try {
             const settingsOpen = pageOpen && viewParam() === 'folders'
-            const [downloadsList, library, freshInfo] = await Promise.all([
-                api('/downloads'), api('/library?since=' + lib.version), settingsOpen ? api('/info') : null,
+            const [downloadsList, library, freshInfo, batchList] = await Promise.all([
+                api('/downloads'), api('/library?since=' + lib.version), settingsOpen ? api('/info') : null, api('/season/batches').catch(() => []),
             ])
             items = downloadsList
+            batches = batchList
             if (freshInfo) info = freshInfo
             if (!library.unchanged) lib = { version: library.version, busy: library.busy, folders: library.folders, items: library.items }
             refreshedOnce = true
@@ -761,7 +1029,9 @@
             return
         }
         byEnc = new Map(items.filter(i => i.streamEnc).map(i => [i.streamEnc, i]))
+        byKey = new Map(items.map(i => [`${i.sourceKey}|${i.videoId}`, i]))
         document.querySelectorAll('a[data-sdl-enc]').forEach(updateBtn)
+        renderMenu()
         updateNav()
         renderPage()
     }
@@ -795,6 +1065,7 @@
 
     let lastSeries = null
     function onRoute() {
+        closeMenu()
         setPage(isPageHash())
         // prechod prehľad ↔ seriál v rámci otvorenej stránky
         const series = pageOpen ? `${seriesParam()}|${viewParam()}` : null
@@ -822,7 +1093,7 @@
         refresh()
         // rýchlejšie obnovovanie iba keď niečo beží alebo je otvorená stránka
         setInterval(() => {
-            const busy = pageOpen || lib.busy || items.some(i => i.status === 'downloading' || i.status === 'queued')
+            const busy = pageOpen || lib.busy || !!menu || batches.some(b => b.status === 'searching') || items.some(i => i.status === 'downloading' || i.status === 'queued')
             if (busy || Date.now() % 10000 < 1600) refresh()
         }, 1500)
     }

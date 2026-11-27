@@ -53,6 +53,7 @@ server.js
 | `lib/proxy.js` | web UI proxy + script injection + disk cache |
 | `lib/playerLink.js` | decodes `#/player/{stream}/…` (base64(zlib(JSON)) from stremio-core) |
 | `lib/downloads.js` | download manager: torrents via `:11470/{hash}/{idx}`, HTTP with Range resume, HLS via ffmpeg |
+| `lib/season.js` | "download the whole season": finds the same source for every episode in the same add-on |
 | `lib/library.js` | library folders: scanning, file name parsing, Cinemeta matching, drive (un)plug detection |
 | `lib/metas.js` | cached metadata and images for offline use |
 | `lib/addon.js` | Stremio add-on + data for the Offline page (playerHref, detailHref) |
@@ -75,7 +76,8 @@ Data (Linux `~/.local/share/stremio-offline/`, macOS `~/Library/Application Supp
 ```bash
 # development instance on ports 11590/11591 with its own data (the installed one keeps running)
 npm run dev
-# test add-on with Creative Commons streams (Sintel torrent, Big Buck Bunny HTTP + HLS)
+# test add-on: Creative Commons streams (Sintel torrent, Big Buck Bunny HTTP + HLS) and generated videos for
+# season 1 of Chernobyl (tt7366338) to test season downloads; STREAM_DELAY_MS=2500 makes it slow like real add-ons
 npm run test-addon
 # fake drive with tiny videos (movies, series, subtitles, an unmatched home video)
 npm run test-library
@@ -136,6 +138,24 @@ STREAMING_SERVER=http://127.0.0.1:9 IDLE_EXIT_MS=6000 PORT=11590 DATA_DIR=/tmp/x
   usually first).
 - The streaming server also supports `GET /{hash}/{idx}?external=1&download=1` (file as attachment) and creates the
   torrent by itself.
+
+## Season downloads
+
+- `POST /__dl/api/season/preview {href}` → the episode list of the season with `aired` and `state`
+  (`offline` / `queued`) for the ⬇ menu; `POST /__dl/api/season {href, scope: 'season'|'rest'}` starts a batch;
+  `GET /__dl/api/season/batches`, `POST …/batches/:id/stop`, `DELETE …/batches/:id` (dismiss).
+- The player link has everything needed: the stream, the add-on's transport URL, the meta add-on, type, id and
+  videoId. The episode list comes from the meta add-on (Cinemeta), other episodes' streams from
+  `{transportUrl}/stream/{type}/{videoId}.json` — two requests at a time, added to the queue in episode order.
+- `pickSameSource()`: same `infoHash` (a season pack, a different `fileIdx`) or a hash in a debrid URL → same
+  `behaviorHints.bingeGroup` (Torrentio uses one per release, e.g. the same group and quality for every episode) →
+  otherwise "similar": same kind (torrent / HTTP), same resolution (or the same release group when there is none),
+  scored by release group, tags (WEB-DL, x265, HDR…) and the add-on's name line. Similar picks and episodes without a
+  match are reported in the batch.
+- Batches live in memory only (a lookup takes seconds); `season.isBusy()` keeps the helper running meanwhile.
+- Episodes added by a batch have no Stremio-encoded stream (`streamEnc: null`). The ⬇ buttons match them by
+  `sourceKey|videoId`: `inject.js` decodes the stream from the link (`DecompressionStream('deflate')`) to get the
+  same `bt:{hash}:{fileIdx}` / `url:{url}` key as the server.
 
 ## Download folder
 

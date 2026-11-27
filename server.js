@@ -19,6 +19,7 @@ import * as metas from './lib/metas.js'
 import * as library from './lib/library.js'
 import * as fsbrowse from './lib/fsbrowse.js'
 import * as settings from './lib/settings.js'
+import * as season from './lib/season.js'
 
 library.setExclude(p => downloads.isDownloadFile(p))
 library.setOnScanned(files => downloads.adoptMoved(files))
@@ -93,6 +94,25 @@ async function handleApi(req, res, pathname) {
             return reply(e.status || 500, { error: e.message })
         }
     }
+    // celá séria z jedného zdroja: preview = údaje pre ponuku pri ⬇, season = spustenie, batches = priebeh hľadania
+    if ((pathname === '/__dl/api/season/preview' || pathname === '/__dl/api/season') && req.method === 'POST') {
+        const { href, scope } = await readJson(req)
+        let parsed
+        try {
+            parsed = parsePlayerHref(String(href || ''))
+        } catch (e) {
+            return reply(400, { error: e.message })
+        }
+        try {
+            return reply(200, pathname.endsWith('/preview') ? await season.preview(parsed) : await season.start(parsed, scope))
+        } catch (e) {
+            return reply(e.status || 500, { error: e.message })
+        }
+    }
+    if (pathname === '/__dl/api/season/batches' && req.method === 'GET') return reply(200, season.list())
+    const sb = pathname.match(/^\/__dl\/api\/season\/batches\/([0-9a-f]+)(\/stop)?$/)
+    if (sb && sb[2] && req.method === 'POST') return reply(season.stop(sb[1]) ? 200 : 409, { ok: true })
+    if (sb && !sb[2] && req.method === 'DELETE') return reply(season.dismiss(sb[1]) ? 200 : 404, { ok: true })
     if (m && !m[1] && req.method === 'GET') return reply(200, downloads.list().map(addon.decorateItem))
     if (pathname === '/__dl/api/downloads/forget-moved' && req.method === 'POST') return reply(200, { forgotten: await downloads.forgetMoved() })
 
@@ -261,7 +281,7 @@ let stremioGoneSince = null
 async function checkIdle() {
     const stremioUp = await fetch(`${STREAMING_SERVER}/settings`, { signal: AbortSignal.timeout(3000) }).then(r => r.ok).catch(() => false)
     // openResponses > 0 = práve sa niečo prehráva alebo načítava z nášho servera
-    const busy = downloads.hasActive(stremioUp) || library.isBusy() || openResponses > 0
+    const busy = downloads.hasActive(stremioUp) || season.isBusy() || library.isBusy() || openResponses > 0
     if (stremioUp || busy) {
         stremioGoneSince = null
         return

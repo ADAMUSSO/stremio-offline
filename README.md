@@ -15,6 +15,10 @@ names and subtitles.
 
 - **⬇ next to every stream** — on a movie or episode page, every stream gets a download button. It shows the
   progress in % and turns into ✓ when the file is saved.
+- **Whole seasons in one click** — on an episode, ⬇ offers *this episode*, *the whole season* or *the rest of the
+  season*. Every episode is taken from the same source you picked (the same torrent or release); if the add-on does
+  not have it for an episode, a similar one in the same quality is used, and you are told which episodes need a
+  different stream.
 - **"Offline" in Stremio's sidebar** — a new section with everything you can watch offline:
   downloads in progress (pause, resume, delete) and grids of **Movies** and **Series**.
 - **Series grouped in folders** — all episodes of a show sit in one card with the show's poster. Opening it shows
@@ -157,6 +161,19 @@ exists on this computer.
 2. Click **⬇** next to a stream. The button shows the progress; click it again to open the Offline section.
 3. When it shows **✓**, the file is saved and plays without internet.
 
+### Download a whole season
+
+1. Open any episode of the season and pick the stream (source and quality) you want.
+2. Click **⬇** next to it and choose **Download season N** — or **Download the rest of season N** to start from this
+   episode. The menu shows how many episodes will be downloaded; episodes that are already offline or downloading,
+   and episodes that have not aired yet, are skipped.
+3. Offline Stremio asks the same add-on for every other episode and picks the same source: the same torrent (a season
+   pack) or the same release (the add-on's *binge group*, which Stremio also uses to play the next episode). If an
+   episode is not available from that source, a similar stream in the same quality is used.
+4. The **Downloading** section shows the progress while the episodes are being looked up. Afterwards a note tells
+   you if an episode was not available from this source — **Choose a stream** opens that episode so you can pick
+   another one.
+
 Downloads continue in the background while Stremio is open. Torrent downloads that were interrupted because Stremio
 was closed continue the next time you open it.
 
@@ -168,7 +185,8 @@ Open **Offline** in the sidebar:
   (files from your own folders are never deleted).
 - **Series** — each show is a folder card with the number of episodes. Open it to see the seasons and episodes you
   have and play any of them. Stremio continues to the next episode automatically.
-- **Downloading** — progress, speed, pause, resume and delete for running downloads.
+- **Downloading** — progress, speed, pause, resume and delete for running downloads, in the order they will be
+  downloaded.
 
 ### Add your own folders or an external drive
 
